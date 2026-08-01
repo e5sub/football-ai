@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>登录｜AI足球赛事研判指挥舱</title>
+  <style>
+    :root{--bg:#070a0f;--panel:rgba(13,20,30,.86);--line:rgba(140,162,190,.2);--text:#eef5ff;--muted:#91a2b7;--cyan:#32d5ff;--green:#33e6a6;--amber:#ffc857;--red:#ff637d;--shadow:0 20px 60px rgba(0,0,0,.38);font-family:Inter,"SF Pro Display","Microsoft YaHei",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}html,body{min-height:100%;margin:0;background:var(--bg);color:var(--text)}button,input,select{font:inherit;color:inherit}button{border:0;cursor:pointer}.hidden{display:none!important}.auth-gate{min-height:100dvh;display:grid;place-items:center;padding:20px;background:linear-gradient(135deg,rgba(50,213,255,.09),transparent 42%),linear-gradient(315deg,rgba(51,230,166,.08),transparent 42%),#070a0f}.auth-gate-box{width:min(460px,100%)}.auth-gate-box h1{margin:0;font-size:28px}.auth-gate-box p{color:var(--muted);line-height:1.6}.panel{border:1px solid var(--line);border-radius:8px;background:var(--panel);box-shadow:var(--shadow);overflow:hidden}.panel-head{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border-bottom:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,rgba(255,255,255,.045),transparent)}.panel-head>*{min-width:0}.panel-title{margin:0;font-size:14px;letter-spacing:0}.panel-sub{min-width:0;color:var(--muted);font-size:12px;overflow-wrap:anywhere}.panel-body{padding:12px}.input{width:100%;height:38px;border-radius:5px;border:1px solid var(--line);background:rgba(5,10,16,.86);outline:none;padding:0 10px;color:var(--text)}.btn{height:38px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:5px;border:1px solid var(--line);background:rgba(255,255,255,.055);color:#e8f2ff;transition:transform .15s,border-color .15s,background .15s;white-space:nowrap}.btn:hover{transform:translateY(-1px);border-color:rgba(50,213,255,.55);background:rgba(50,213,255,.1)}.btn.primary{background:linear-gradient(135deg,rgba(50,213,255,.26),rgba(51,230,166,.16));border-color:rgba(50,213,255,.58)}.message{min-height:22px;color:var(--amber);font-size:13px}.manual-form{display:grid;gap:12px}.manual-form label{display:grid;gap:7px;color:#d9e7f8;font-size:13px}.manual-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  </style>
+</head>
+<body>
+  <section class="auth-gate" id="authGate">
+    <div class="panel auth-gate-box">
+      <div class="panel-head"><div><h1>AI足球赛事研判指挥舱</h1><div class="panel-sub">登录后查看赛事研判与个人下注记录</div></div></div>
+      <div class="panel-body">
+        <form class="manual-form" id="gateLoginForm">
+          <label>邮箱<input class="input" id="gateEmail" type="email" autocomplete="email" required></label>
+          <label>密码<input class="input" id="gatePassword" type="password" autocomplete="current-password" minlength="8" required></label>
+          <div class="manual-actions"><button class="btn primary" type="submit">登录</button><button class="btn" id="gateShowRegisterBtn" type="button">注册账号</button></div>
+        </form>
+        <form class="manual-form hidden" id="gateRegisterForm">
+          <label>邮箱<input class="input" id="gateRegisterEmail" type="email" autocomplete="email" required></label>
+          <label>密码<input class="input" id="gateRegisterPassword" type="password" autocomplete="new-password" minlength="8" required></label>
+          <label>激活码（可选）<input class="input" id="gateActivationCode" autocomplete="off" placeholder="管理员提供时填写"></label>
+          <div class="panel-sub">注册默认赠送 3 天使用权，也可填写管理员提供的激活码。</div>
+          <div class="manual-actions"><button class="btn primary" type="submit">注册</button><button class="btn" id="gateShowLoginBtn" type="button">返回登录</button></div>
+        </form>
+        <div class="message" id="gateMessage"></div>
+      </div>
+    </div>
+  </section>
+  <script>
+    const state = { csrfToken: "" };
+    const $ = (id) => document.getElementById(id);
+
+    function bindEvents() {
+      $("gateLoginForm").addEventListener("submit", loginGate);
+      $("gateRegisterForm").addEventListener("submit", registerGate);
+      $("gateShowRegisterBtn").addEventListener("click", () => { $("gateLoginForm").classList.add("hidden"); $("gateRegisterForm").classList.remove("hidden"); });
+      $("gateShowLoginBtn").addEventListener("click", () => { $("gateRegisterForm").classList.add("hidden"); $("gateLoginForm").classList.remove("hidden"); });
+    }
+
+    async function apiRequest(path, options = {}) {
+      const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+      if (["POST", "PUT", "PATCH", "DELETE"].includes(String(options.method || "GET").toUpperCase())) {
+        headers["X-CSRF-Token"] = state.csrfToken;
+      }
+      const response = await fetch(`/api${path}`, {...options, headers, credentials: "same-origin", cache: "no-store"});
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(payload.detail || "服务请求失败");
+        error.status = response.status;
+        throw error;
+      }
+      return payload;
+    }
+
+    async function loadCsrfToken() {
+      try {
+        const response = await fetch(`/api/auth/csrf?__session=${Date.now()}`, {credentials: "same-origin", cache: "no-store"});
+        const payload = await response.json();
+        state.csrfToken = payload.csrf_token || "";
+        if (!state.csrfToken) throw new Error("CSRF token 获取失败");
+      } catch (e) {
+        $("gateMessage").textContent = `初始化失败: ${e.message}`;
+      }
+    }
+
+    async function loginGate(event) {
+      event.preventDefault();
+      $("gateMessage").textContent = "登录中...";
+      try {
+        const payload = await apiRequest("/auth/login", {method: "POST", body: JSON.stringify({email: $("gateEmail").value, password: $("gatePassword").value})});
+        localStorage.setItem("football_ai_session", payload.token);
+        location.href = "/";
+      } catch (error) { $("gateMessage").textContent = error.message; }
+    }
+
+    async function registerGate(event) {
+      event.preventDefault();
+      $("gateMessage").textContent = "注册中...";
+      try {
+        const activationCode = $("gateActivationCode").value.trim();
+        const payload = await apiRequest("/auth/register", {method: "POST", body: JSON.stringify({email: $("gateRegisterEmail").value, password: $("gateRegisterPassword").value, activation_code: activationCode || null})});
+        $("gateMessage").textContent = payload.message + " 请登录。";
+        $("gateRegisterForm").classList.add("hidden");
+        $("gateLoginForm").classList.remove("hidden");
+        $("gateEmail").value = $("gateRegisterEmail").value;
+      } catch (error) { $("gateMessage").textContent = error.message; }
+    }
+
+    async function init() {
+      await loadCsrfToken();
+      bindEvents();
+    }
+
+    init();
+  </script>
+</body>
+</html>

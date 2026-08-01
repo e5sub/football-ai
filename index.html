@@ -28,6 +28,13 @@
     * { box-sizing: border-box; }
     html, body { min-height: 100%; margin: 0; background: var(--bg); color: var(--text); }
     body {
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background:
+        linear-gradient(135deg, rgba(50,213,255,.09), transparent 42%),
+        linear-gradient(315deg, rgba(51,230,166,.08), transparent 42%),
+        #070a0f;
       overflow-x: hidden;
       background:
         linear-gradient(120deg, rgba(50, 213, 255, .08), transparent 34%),
@@ -38,21 +45,9 @@
     button { border: 0; cursor: pointer; }
     .mono { font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace; font-variant-numeric: tabular-nums; }
     .hidden { display: none !important; }
-    body.auth-locked #app { display: none; }
-    .auth-gate {
-      min-height: 100dvh;
-      display: grid;
-      place-items: center;
-      padding: 20px;
-      background:
-        linear-gradient(135deg, rgba(50,213,255,.09), transparent 42%),
-        linear-gradient(315deg, rgba(51,230,166,.08), transparent 42%),
-        #070a0f;
+    body.loading #app {
+      display: none;
     }
-    .auth-gate-box { width: min(460px, 100%); }
-    .auth-gate-box h1 { margin: 0; font-size: 28px; }
-    .auth-gate-box p { color: var(--muted); line-height: 1.6; }
-
     .shell { min-height: 100dvh; padding: 16px; }
     .topbar {
       position: sticky;
@@ -566,27 +561,7 @@
   </style>
 </head>
 <body>
-  <section class="auth-gate" id="authGate">
-    <div class="panel auth-gate-box">
-      <div class="panel-head"><div><h1>AI足球赛事研判指挥舱</h1><div class="panel-sub">登录后查看赛事研判与个人下注记录</div></div></div>
-      <div class="panel-body">
-        <form class="manual-form" id="gateLoginForm">
-          <label>邮箱<input class="input" id="gateEmail" type="email" autocomplete="email" required></label>
-          <label>密码<input class="input" id="gatePassword" type="password" autocomplete="current-password" minlength="8" required></label>
-          <div class="manual-actions"><button class="btn primary" type="submit">登录</button><button class="btn" id="gateShowRegisterBtn" type="button">注册账号</button></div>
-        </form>
-        <form class="manual-form hidden" id="gateRegisterForm">
-          <label>邮箱<input class="input" id="gateRegisterEmail" type="email" autocomplete="email" required></label>
-          <label>密码<input class="input" id="gateRegisterPassword" type="password" autocomplete="new-password" minlength="8" required></label>
-          <label>激活码（可选）<input class="input" id="gateActivationCode" autocomplete="off" placeholder="管理员提供时填写"></label>
-          <div class="panel-sub">注册默认赠送 3 天使用权，也可填写管理员提供的激活码。</div>
-          <div class="manual-actions"><button class="btn primary" type="submit">注册</button><button class="btn" id="gateShowLoginBtn" type="button">返回登录</button></div>
-        </form>
-        <div class="message" id="gateMessage"></div>
-      </div>
-    </div>
-  </section>
-  <div class="shell" id="app">
+  <div class="shell" id="app" style="display: none;">
     <header class="topbar">
       <div class="brand">
         <div class="brand-mark">AI</div>
@@ -940,22 +915,6 @@
 
     init();
 
-    async function init() {
-      document.body.classList.add("auth-locked");
-      bindEvents();
-      registerOfflineSupport();
-      await loadCsrfToken();
-      await restoreAccount();
-      if (!state.user) {
-        showAuthGate();
-        return;
-      }
-      await loadData();
-      updateAdminVisibility();
-      renderAll();
-      startLiveRefresh();
-    }
-
     function bindEvents() {
       $("searchInput").addEventListener("input", renderMatchList);
       $("leagueFilter").addEventListener("change", renderMatchList);
@@ -983,10 +942,6 @@
       $("manualCancelBtn").addEventListener("click", closeManualLayer);
       $("manualForm").addEventListener("submit", createManualMatch);
       $("deleteManualBtn").addEventListener("click", deleteActiveManualMatch);
-      $("gateLoginForm").addEventListener("submit", loginGate);
-      $("gateRegisterForm").addEventListener("submit", registerGate);
-      $("gateShowRegisterBtn").addEventListener("click", () => { $("gateLoginForm").classList.add("hidden"); $("gateRegisterForm").classList.remove("hidden"); });
-      $("gateShowLoginBtn").addEventListener("click", () => { $("gateRegisterForm").classList.add("hidden"); $("gateLoginForm").classList.remove("hidden"); });
       document.querySelectorAll("[data-account-tab]").forEach(button => button.addEventListener("click", () => {
         document.querySelectorAll("[data-account-tab]").forEach(item => item.classList.toggle("active", item === button));
         const target = button.dataset.accountTab;
@@ -1028,19 +983,6 @@
       location.href = "/admin.html";
     }
 
-    function showAuthGate() {
-      $("authGate").classList.remove("hidden");
-    }
-
-    async function enterHomepage() {
-      document.body.classList.remove("auth-locked");
-      $("authGate").classList.add("hidden");
-      await loadData();
-      updateAdminVisibility();
-      renderAll();
-      startLiveRefresh();
-    }
-
     let liveRefreshTimer = null;
     function startLiveRefresh() {
       if (liveRefreshTimer) return;
@@ -1061,48 +1003,35 @@
       }
     }
 
-    async function loginGate(event) {
-      event.preventDefault();
-      $("gateMessage").textContent = "登录中...";
-      try {
-        const payload = await apiRequest("/auth/login", {method: "POST", body: JSON.stringify({email: $("gateEmail").value, password: $("gatePassword").value})});
-        state.authToken = payload.token;
-        state.user = payload.user;
-        localStorage.setItem("football_ai_session", state.authToken);
-        updateAccountBadge();
-        await enterHomepage();
-      } catch (error) { $("gateMessage").textContent = error.message; }
-    }
-
-    async function registerGate(event) {
-      event.preventDefault();
-      $("gateMessage").textContent = "注册中...";
-      try {
-        const activationCode = $("gateActivationCode").value.trim();
-        const payload = await apiRequest("/auth/register", {method: "POST", body: JSON.stringify({email: $("gateRegisterEmail").value, password: $("gateRegisterPassword").value, activation_code: activationCode || null})});
-        $("gateMessage").textContent = payload.message;
-        $("gateRegisterForm").classList.add("hidden");
-        $("gateLoginForm").classList.remove("hidden");
-        $("gateEmail").value = $("gateRegisterEmail").value;
-      } catch (error) { $("gateMessage").textContent = error.message; }
-    }
-
     async function restoreAccount() {
       try {
+        if (!state.authToken && !state.adminToken) return null;
         state.user = await apiRequest(`/auth/me?__session=${Date.now()}`);
         updateAccountBadge();
+        updateAdminVisibility();
+        return state.user;
       } catch (error) {
         if (error.status === 401 || error.status === 403) {
           // If session is invalid, clear the token to prevent re-using it.
-          logoutAccount({ remote: false }); // Only clear local state
+          state.authToken = "";
+          state.user = null;
+          localStorage.removeItem("football_ai_session");
+          return null;
         } else {
           console.warn("会话恢复失败，可能是网络问题。", error);
+          return state.user; // return stale user data if network error
         }
       }
     }
 
     function openAccountLayer() {
       location.href = "/account.html";
+    async function openAccountLayer() {
+      if (!state.user) {
+        $("accountLayer").classList.remove("hidden");
+      } else {
+        location.href = "/account.html";
+      }
     }
 
     function closeAccountLayer() { $("accountLayer").classList.add("hidden"); }
@@ -1113,6 +1042,7 @@
       $("authMember").classList.toggle("hidden", !state.user);
       if (state.user) renderAccountProfile();
       updateAdminVisibility();
+      if (state.user) loadBetRecords().catch(e => setBetMessage(e.message));
     }
 
     function renderAccountProfile() {
@@ -1162,12 +1092,10 @@
       if (remote) fetch("/api/auth/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": state.csrfToken}}).catch(() => {});
       state.authToken = "";
       state.user = null;
+      state.adminToken = "";
       localStorage.removeItem("football_ai_session");
-      updateAccountBadge();
-      document.body.classList.add("auth-locked");
-      showAuthGate();
-      $("betList").innerHTML = "";
-      $("betSummary").innerHTML = "";
+      localStorage.removeItem("football_ai_admin_session");
+      location.href = "/login.html";
     }
 
     async function loadBetRecords() {
@@ -1252,6 +1180,25 @@
     function setAuthMessage(value) { $("authMessage").textContent = value; }
     function setBetMessage(value) { $("betMessage").textContent = value; }
 
+    async function init() {
+      document.body.classList.add("loading");
+      await loadCsrfToken();
+      const user = await restoreAccount();
+
+      if (!user) {
+        location.href = "/login.html";
+        return;
+      }
+
+      document.body.classList.remove("loading");
+      $("app").style.display = "";
+      bindEvents();
+      registerOfflineSupport();
+      await loadData();
+      renderAll();
+      startLiveRefresh();
+    }
+
     async function loadData() {
       const cached = readCachedJson(DATA_CACHE_KEY);
       try {
@@ -1306,6 +1253,7 @@
       $("complianceText").textContent = meta.compliance || "仅提供体育数据分析、赛前研究与内容创作参考；不涉及赌博，不提供下注服务，不承诺结果。";
       renderLeagueFilter();
       renderMatchList();
+      updateAccountBadge();
       renderActiveMatch();
       renderPortfolio();
     }
