@@ -157,11 +157,14 @@ DATA_UPDATE_STATUS = {"running": False, "message": "", "output": "", "started_at
 
 
 def write_update_log(message: str, output: str = "") -> None:
-    DATA_UPDATE_LOG.parent.mkdir(parents=True, exist_ok=True)
-    with DATA_UPDATE_LOG.open("a", encoding="utf-8") as log_file:
-        log_file.write(f"[{now().isoformat()}] {message}\n")
-        if output:
-            log_file.write(f"{output[-4000:]}\n")
+    try:
+        DATA_UPDATE_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with DATA_UPDATE_LOG.open("a", encoding="utf-8") as log_file:
+            log_file.write(f"[{now().isoformat()}] {message}\n")
+            if output:
+                log_file.write(f"{output[-4000:]}\n")
+    except OSError:
+        return
 
 
 class RegisterRequest(BaseModel):
@@ -252,37 +255,47 @@ def user_has_access(user: User) -> bool:
 
 
 def current_user(authorization: Annotated[str | None, Header()] = None, auth_cookie: Annotated[str | None, Cookie(alias=AUTH_COOKIE)] = None, db: Session = Depends(db_session)) -> User:
-    token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else auth_cookie
-    if not token:
+    header_token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else None
+    tokens = [token for token in (header_token, auth_cookie) if token]
+    if not tokens:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请先登录")
-    session_token = db.scalar(select(SessionToken).where(SessionToken.token_hash == digest(token)))
-    if not session_token or as_utc(session_token.expires_at) < now():
+    session_token = None
+    user = None
+    for token in tokens:
+        candidate = db.scalar(select(SessionToken).where(SessionToken.token_hash == digest(token)))
+        if candidate and as_utc(candidate.expires_at) >= now():
+            candidate_user = db.get(User, candidate.user_id)
+            if candidate_user and user_has_access(candidate_user):
+                session_token, user = candidate, candidate_user
+                break
+    if not session_token or not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录已过期")
-    user = db.get(User, session_token.user_id)
-    if not user or not user_has_access(user):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="账号尚未激活")
     session_token.expires_at = now() + timedelta(days=SESSION_DAYS)
     db.commit()
     return user
 
 
 def current_admin(authorization: Annotated[str | None, Header()] = None, admin_cookie: Annotated[str | None, Cookie(alias=ADMIN_COOKIE)] = None, auth_cookie: Annotated[str | None, Cookie(alias=AUTH_COOKIE)] = None, db: Session = Depends(db_session)) -> AdminSession | SessionToken:
-    token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else admin_cookie or auth_cookie
-    if not token:
+    header_token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else None
+    tokens = [token for token in (header_token, admin_cookie, auth_cookie) if token]
+    if not tokens:
         raise HTTPException(status_code=401, detail="需要管理员登录")
-    session = db.scalar(select(AdminSession).where(AdminSession.token_hash == digest(token)))
-    if session:
-        if as_utc(session.expires_at) < now():
-            raise HTTPException(status_code=401, detail="管理员会话已过期")
-        user = db.get(User, session.user_id) if session.user_id else None
-        admin_session = session
-    else:
+    admin_session = None
+    user = None
+    for token in tokens:
+        session = db.scalar(select(AdminSession).where(AdminSession.token_hash == digest(token)))
+        if session and as_utc(session.expires_at) >= now():
+            candidate_user = db.get(User, session.user_id) if session.user_id else None
+            if candidate_user and candidate_user.is_admin and user_has_access(candidate_user):
+                admin_session, user = session, candidate_user
+                break
         user_session = db.scalar(select(SessionToken).where(SessionToken.token_hash == digest(token)))
-        if not user_session or as_utc(user_session.expires_at) < now():
-            raise HTTPException(status_code=401, detail="管理员会话已过期")
-        user = db.get(User, user_session.user_id)
-        admin_session = user_session
-    if not user or not user.is_admin or not user_has_access(user):
+        if user_session and as_utc(user_session.expires_at) >= now():
+            candidate_user = db.get(User, user_session.user_id)
+            if candidate_user and candidate_user.is_admin and user_has_access(candidate_user):
+                admin_session, user = user_session, candidate_user
+                break
+    if not admin_session or not user:
         raise HTTPException(status_code=403, detail="没有管理员权限")
     admin_session.expires_at = now() + timedelta(days=SESSION_DAYS)
     db.commit()
