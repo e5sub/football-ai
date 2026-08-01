@@ -1,6 +1,6 @@
 services:
   app:
-    image: ${IMAGE_NAME:-ghcr.io/your-org/football-ai-command-center:latest}
+    image: ${IMAGE_NAME:-ghcr.io/your-org/ai-football:latest}
     container_name: football-ai
     environment:
       TZ: Asia/Shanghai

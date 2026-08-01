@@ -52,7 +52,7 @@ GitHub Actions 在北京时间 08:15、14:15、18:15、22:15、00:15、02:15、0
 推送到 `main` 分支后，GitHub Actions 会自动构建并发布到 GitHub Container Registry：
 
 ```text
-ghcr.io/<GitHub用户名或组织>/football-ai-command-center:latest
+ghcr.io/<GitHub用户名或组织>/ai-football:latest
 ```
 
 首次使用需要在仓库 Settings > Actions > General 中允许 GitHub Actions 创建和写入 packages。版本 tag（例如 `v1.0.0`）还会生成对应版本镜像标签。
