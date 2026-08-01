@@ -355,6 +355,13 @@ def current_user(
 ) -> User:
     header_token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else None
     tokens = [token for token in (header_token, auth_cookie, admin_cookie) if token]
+    # Primary path: a permanent signed browser session, equivalent to Flask's
+    # built-in session cookie. It survives an application restart because its
+    # signature key is persisted independently of the session-token table.
+    for token in tokens:
+        signed_user = remembered_user(token, db)
+        if signed_user:
+            return signed_user
     if not tokens:
         user = remembered_user(remember_cookie, db)
         if user:
@@ -613,10 +620,11 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(db_se
         raise HTTPException(status_code=401, detail="邮箱或密码错误")
     if not user_has_access(user):
         raise HTTPException(status_code=403, detail="账号使用权已过期，请使用激活码或联系管理员")
-    raw_token = secrets.token_urlsafe(32)
     expires_at = now() + timedelta(days=SESSION_DAYS)
-    db.add(SessionToken(user_id=user.id, token_hash=digest(raw_token), expires_at=expires_at))
-    db.commit()
+    # The signed cookie is the primary session, mirroring the persistent Flask
+    # session used by the reference project. No database session row is needed
+    # to restore an ordinary user after a restart.
+    raw_token = remember_token(user, expires_at)
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.set_cookie(AUTH_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     response.set_cookie(REMEMBER_COOKIE, remember_token(user, expires_at), httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
@@ -627,6 +635,7 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(db_se
 def me(response: Response, user: User = Depends(current_user)) -> dict:
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     expires_at = now() + timedelta(days=SESSION_DAYS)
+    response.set_cookie(AUTH_COOKIE, remember_token(user, expires_at), httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     response.set_cookie(REMEMBER_COOKIE, remember_token(user, expires_at), httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     return user_payload(user)
 
@@ -637,10 +646,9 @@ def admin_login(payload: AdminLoginRequest, response: Response, db: Session = De
     if not user or not user.is_admin or not user_has_access(user) or not check_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="管理员账号或密码错误")
     raw_token = secrets.token_urlsafe(32)
-    user_token = secrets.token_urlsafe(32)
     expires_at = now() + timedelta(days=SESSION_DAYS)
+    user_token = remember_token(user, expires_at)
     db.add(AdminSession(user_id=user.id, token_hash=digest(raw_token), expires_at=expires_at))
-    db.add(SessionToken(user_id=user.id, token_hash=digest(user_token), expires_at=expires_at))
     db.commit()
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.set_cookie(ADMIN_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
