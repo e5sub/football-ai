@@ -270,8 +270,10 @@ def current_user(authorization: Annotated[str | None, Header()] = None, auth_coo
                 break
     if not session_token or not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录已过期")
-    session_token.expires_at = now() + timedelta(days=SESSION_DAYS)
-    db.commit()
+    # The browser token already has the same fixed lifetime.  Avoid writing on
+    # every authenticated GET: a transient database write failure here used to
+    # turn a page refresh into a failed login and also blocked admin actions
+    # before their handler ran.
     return user
 
 
@@ -297,8 +299,8 @@ def current_admin(authorization: Annotated[str | None, Header()] = None, admin_c
                 break
     if not admin_session or not user:
         raise HTTPException(status_code=403, detail="没有管理员权限")
-    admin_session.expires_at = now() + timedelta(days=SESSION_DAYS)
-    db.commit()
+    # Keep authentication checks read-only; see current_user above.  Admin
+    # requests must not depend on a session-renewal write succeeding.
     return admin_session
 
 
@@ -538,7 +540,10 @@ def run_data_update() -> None:
             timeout=1800,
             check=False,
         )
-        output = (result.stdout or result.stderr or "").strip()
+        # Keep stderr as well as stdout.  The updater prints its summary to
+        # stdout, so using `stdout or stderr` previously hid the actual MySQL
+        # connection/permission error from the administrator.
+        output = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
         finished_at = now()
         with DATA_UPDATE_STATUS_LOCK:
             started_at = DATA_UPDATE_STATUS.get("started_at")

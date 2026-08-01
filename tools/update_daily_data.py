@@ -163,22 +163,24 @@ def main() -> None:
         except Exception as exc:  # noqa: BLE001
             database_status = "failed"
             warnings.append(f"数据库同步失败，已保留 JSON 数据：{exc}")
-    print(
-        json.dumps(
-            {
-                "status": update_status,
-                "matches": len(matches),
-                "history": len(history),
-                "leagues": len(profiles),
-                "teams": len(team_profiles),
-                "archive": len(archive),
-                "fixtureCatalog": len(fixture_catalog.get("matches") or []),
-                "database": database_status,
-                "warnings": warnings[:5],
-            },
-            ensure_ascii=False,
-        )
-    )
+    summary = {
+        "status": update_status,
+        "matches": len(matches),
+        "history": len(history),
+        "leagues": len(profiles),
+        "teams": len(team_profiles),
+        "archive": len(archive),
+        "fixtureCatalog": len(fixture_catalog.get("matches") or []),
+        "database": database_status,
+        "warnings": warnings[:5],
+    }
+    print(json.dumps(summary, ensure_ascii=False))
+
+    # The API serves database snapshots before the JSON files.  Treat a failed
+    # snapshot write as a failed update, otherwise the admin UI reports success
+    # while users continue receiving the previous database data.
+    if database_status == "failed":
+        raise SystemExit("数据库同步失败；详情见上方 warnings")
 
 
 def sync_database(datasets: dict[str, dict[str, Any]]) -> None:
