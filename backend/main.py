@@ -254,9 +254,14 @@ def user_has_access(user: User) -> bool:
     return user.is_active and (user.is_admin or user.activation_expires_at is None or as_utc(user.activation_expires_at) > now())
 
 
-def current_user(authorization: Annotated[str | None, Header()] = None, auth_cookie: Annotated[str | None, Cookie(alias=AUTH_COOKIE)] = None, db: Session = Depends(db_session)) -> User:
+def current_user(
+    authorization: Annotated[str | None, Header()] = None,
+    auth_cookie: Annotated[str | None, Cookie(alias=AUTH_COOKIE)] = None,
+    admin_cookie: Annotated[str | None, Cookie(alias=ADMIN_COOKIE)] = None,
+    db: Session = Depends(db_session),
+) -> User:
     header_token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else None
-    tokens = [token for token in (header_token, auth_cookie) if token]
+    tokens = [token for token in (header_token, auth_cookie, admin_cookie) if token]
     if not tokens:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请先登录")
     session_token = None
@@ -267,6 +272,15 @@ def current_user(authorization: Annotated[str | None, Header()] = None, auth_coo
             candidate_user = db.get(User, candidate.user_id)
             if candidate_user and user_has_access(candidate_user):
                 session_token, user = candidate, candidate_user
+                break
+        # An administrator is also a valid signed-in user.  This lets a
+        # direct admin login return to the homepage without requiring a second
+        # login just to create a regular session token.
+        admin_session = db.scalar(select(AdminSession).where(AdminSession.token_hash == digest(token)))
+        if admin_session and as_utc(admin_session.expires_at) >= now():
+            candidate_user = db.get(User, admin_session.user_id) if admin_session.user_id else None
+            if candidate_user and candidate_user.is_admin and user_has_access(candidate_user):
+                session_token, user = admin_session, candidate_user
                 break
     if not session_token or not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录已过期")
