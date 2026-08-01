@@ -1018,7 +1018,7 @@
     }
 
     async function loadCsrfToken() {
-      const response = await fetch("/api/auth/csrf", {credentials: "same-origin"});
+      const response = await fetch(`/api/auth/csrf?__session=${Date.now()}`, {credentials: "same-origin", cache: "no-store"});
       const payload = await response.json();
       state.csrfToken = payload.csrf_token || "";
       if (!state.csrfToken) throw new Error("CSRF token 获取失败");
@@ -1089,14 +1089,20 @@
 
     async function restoreAccount() {
       try {
-        state.user = await apiRequest("/auth/me");
+        state.user = await apiRequest(`/auth/me?__session=${Date.now()}`);
         updateAccountBadge();
       } catch (error) {
-        // Do not call the remote logout endpoint while restoring a session.
-        // A temporary failed request must not delete an otherwise valid
-        // HttpOnly cookie, which would force the user to sign in again after
-        // refreshing the page.
-        if (error.status === 401 || error.status === 403) logoutAccount({remote: false});
+        // An edge cache can briefly replay an old 401/403 during deployment.
+        // Retry with a fresh URL and retain local credentials unless the user
+        // explicitly chooses to log out.
+        if (error.status !== 401 && error.status !== 403) return;
+        try {
+          await new Promise(resolve => setTimeout(resolve, 150));
+          state.user = await apiRequest(`/auth/me?__session=${Date.now()}-${Math.random().toString(36).slice(2)}`);
+          updateAccountBadge();
+        } catch (retryError) {
+          console.warn("会话恢复失败；已保留本地凭据以便下次刷新重试。", retryError);
+        }
       }
     }
 

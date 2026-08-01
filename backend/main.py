@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Response, status
+from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -149,6 +149,19 @@ def initialize_database() -> None:
 initialize_database()
 app = FastAPI(title="Football AI Command Center API", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
+
+
+@app.middleware("http")
+async def prevent_cdn_caching_api(request: Request, call_next):
+    """Authentication and user data must never be replayed by an edge cache."""
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0, private"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Surrogate-Control"] = "no-store"
+        response.headers["CDN-Cache-Control"] = "no-store"
+        response.headers["Vary"] = "Cookie, Authorization, X-CSRF-Token"
+    return response
 CSRF_COOKIE = "football_ai_csrf"
 AUTH_COOKIE = "football_ai_auth"
 ADMIN_COOKIE = "football_ai_admin"
@@ -941,22 +954,22 @@ def settle_get(x_admin_key: Annotated[str | None, Header()] = None, db: Session 
 
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
-    return FileResponse(ROOT / "index.html")
+    return FileResponse(ROOT / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/admin.html", include_in_schema=False)
 def admin_page() -> FileResponse:
-    return FileResponse(ROOT / "admin.html")
+    return FileResponse(ROOT / "admin.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/account.html", include_in_schema=False)
 def account_page() -> FileResponse:
-    return FileResponse(ROOT / "account.html")
+    return FileResponse(ROOT / "account.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/sw.js", include_in_schema=False)
 def service_worker() -> FileResponse:
-    return FileResponse(ROOT / "sw.js", media_type="application/javascript")
+    return FileResponse(ROOT / "sw.js", media_type="application/javascript", headers={"Cache-Control": "no-cache"})
 
 
 app.mount("/data", StaticFiles(directory=str(ROOT / "data")), name="data")
