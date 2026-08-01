@@ -250,6 +250,8 @@ def current_user(authorization: Annotated[str | None, Header()] = None, db: Sess
     user = db.get(User, session_token.user_id)
     if not user or not user_has_access(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="账号尚未激活")
+    session_token.expires_at = now() + timedelta(days=SESSION_DAYS)
+    db.commit()
     return user
 
 
@@ -271,6 +273,8 @@ def current_admin(authorization: Annotated[str | None, Header()] = None, db: Ses
         admin_session = user_session
     if not user or not user.is_admin or not user_has_access(user):
         raise HTTPException(status_code=403, detail="没有管理员权限")
+    admin_session.expires_at = now() + timedelta(days=SESSION_DAYS)
+    db.commit()
     return admin_session
 
 
@@ -716,6 +720,11 @@ def settle_get(x_admin_key: Annotated[str | None, Header()] = None, db: Session 
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
     return FileResponse(ROOT / "index.html")
+
+
+@app.get("/admin.html", include_in_schema=False)
+def admin_page() -> FileResponse:
+    return FileResponse(ROOT / "admin.html")
 
 
 @app.get("/sw.js", include_in_schema=False)
