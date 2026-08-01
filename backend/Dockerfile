@@ -6,6 +6,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY backend /app/backend
 COPY tools /app/tools
 COPY index.html /app/index.html
+COPY account.html /app/account.html
 COPY admin.html /app/admin.html
 COPY sw.js /app/sw.js
 COPY data /app/data

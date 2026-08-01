@@ -154,6 +154,12 @@ DATA_UPDATE_LOCK = threading.Lock()
 DATA_UPDATE_STATUS_LOCK = threading.Lock()
 DATA_UPDATE_LOG = ROOT / "logs" / "data_update.log"
 DATA_UPDATE_STATUS = {"running": False, "message": "", "output": "", "started_at": None, "finished_at": None, "duration_seconds": None}
+JSON_SNAPSHOT_FILES = {
+    "matches": ROOT / "data" / "matches.json",
+    "history": ROOT / "data" / "jc_history.json",
+    "analysis_archive": ROOT / "data" / "analysis_archive.json",
+    "fixture_catalog": ROOT / "data" / "fixture_catalog.json",
+}
 
 
 def write_update_log(message: str, output: str = "") -> None:
@@ -165,6 +171,30 @@ def write_update_log(message: str, output: str = "") -> None:
                 log_file.write(f"{output[-4000:]}\n")
     except OSError:
         return
+
+
+def import_json_snapshots() -> dict[str, str]:
+    """Import the generated data files directly into database snapshots."""
+    db = SessionLocal()
+    results: dict[str, str] = {}
+    try:
+        for dataset_key, path in JSON_SNAPSHOT_FILES.items():
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                record = db.get(DataSnapshot, dataset_key)
+                if record is None:
+                    db.add(DataSnapshot(dataset_key=dataset_key, payload=payload))
+                else:
+                    record.payload = payload
+                    record.updated_at = now()
+                db.commit()
+                results[dataset_key] = "success"
+            except Exception as exc:  # noqa: BLE001
+                db.rollback()
+                results[dataset_key] = f"failed: {exc}"
+    finally:
+        db.close()
+    return results
 
 
 class RegisterRequest(BaseModel):
@@ -616,6 +646,14 @@ def admin_update_data_status(_: AdminSession = Depends(current_admin)) -> dict:
         return dict(DATA_UPDATE_STATUS)
 
 
+@app.post("/api/admin/import-data", dependencies=[Depends(csrf_protect)])
+def admin_import_data(_: AdminSession = Depends(current_admin)) -> dict:
+    results = import_json_snapshots()
+    if results.get("matches") != "success":
+        raise HTTPException(status_code=500, detail=f"赛事 JSON 导入数据库失败：{results.get('matches', '未知错误')}")
+    return {"message": "JSON 数据已导入数据库", "results": results}
+
+
 @app.get("/api/admin/users")
 def admin_users(_: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
     users = db.scalars(select(User).order_by(User.created_at.desc())).all()
@@ -821,6 +859,11 @@ def index() -> FileResponse:
 @app.get("/admin.html", include_in_schema=False)
 def admin_page() -> FileResponse:
     return FileResponse(ROOT / "admin.html")
+
+
+@app.get("/account.html", include_in_schema=False)
+def account_page() -> FileResponse:
+    return FileResponse(ROOT / "account.html")
 
 
 @app.get("/sw.js", include_in_schema=False)
