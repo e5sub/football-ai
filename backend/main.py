@@ -86,6 +86,7 @@ class ActivationCode(Base):
     __tablename__ = "activation_codes"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    code_plain: Mapped[str | None] = mapped_column(String(64), nullable=True)
     code_hint: Mapped[str] = mapped_column(String(12))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     grant_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -146,6 +147,8 @@ def initialize_database() -> None:
         activation_code_columns = {column["name"] for column in inspector.get_columns("activation_codes")}
         if "grant_days" not in activation_code_columns:
             connection.execute(text("ALTER TABLE activation_codes ADD COLUMN grant_days INTEGER NULL"))
+        if "code_plain" not in activation_code_columns:
+            connection.execute(text("ALTER TABLE activation_codes ADD COLUMN code_plain VARCHAR(64) NULL"))
 
 
 initialize_database()
@@ -257,13 +260,33 @@ class AdminPasswordResetRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
-class UserStatusRequest(BaseModel):
-    is_active: bool
+DURATION_GRANT_DAYS = {"month": 30, "half_year": 180, "year": 365}
+DurationLiteral = Literal["month", "half_year", "year", "permanent"]
 
 
 class ActivationCodeRequest(BaseModel):
     expires_hours: int = Field(default=72, ge=1, le=8760)
-    duration: Literal["month", "half_year", "year", "permanent"] = "month"
+    duration: DurationLiteral = "month"
+
+
+class AdminCreateUserRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    duration: DurationLiteral = "month"
+
+
+class AdminUpdateUserRequest(BaseModel):
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+    duration: Literal["month", "half_year", "year", "permanent", "expired"] | None = None
+    is_active: bool | None = None
+
+
+class ActivateRequest(BaseModel):
+    activation_code: str = Field(min_length=8, max_length=64)
+
+
+class UserStatusRequest(BaseModel):
+    is_active: bool
 
 
 def now() -> datetime:
@@ -288,7 +311,7 @@ def remember_token(user: User, expires_at: datetime) -> str:
     return urlsafe_b64encode(f"{payload}:{signature}".encode("utf-8")).decode("ascii")
 
 
-def remembered_user(token: str | None, db: Session) -> User | None:
+def remembered_user(token: str | None, db: Session, require_access: bool = True) -> User | None:
     if not token:
         return None
     try:
@@ -298,7 +321,7 @@ def remembered_user(token: str | None, db: Session) -> User | None:
         if not hmac.compare_digest(signature, expected) or int(expires_at) < int(now().timestamp()):
             return None
         user = db.get(User, int(user_id))
-        if not user or not hmac.compare_digest(password_fingerprint, digest(user.password_hash)) or not user_has_access(user):
+        if not user or not hmac.compare_digest(password_fingerprint, digest(user.password_hash)) or (require_access and not user_has_access(user)):
             return None
         return user
     except (BinasciiError, ValueError, UnicodeDecodeError, TypeError):
@@ -401,6 +424,46 @@ def current_user(
     return user
 
 
+def current_user_lenient(
+    authorization: Annotated[str | None, Header()] = None,
+    auth_cookie: Annotated[str | None, Cookie(alias=AUTH_COOKIE)] = None,
+    admin_cookie: Annotated[str | None, Cookie(alias=ADMIN_COOKIE)] = None,
+    remember_cookie: Annotated[str | None, Cookie(alias=REMEMBER_COOKIE)] = None,
+    db: Session = Depends(db_session),
+) -> User:
+    """Like current_user but allows accounts whose access has expired.
+
+    Used by /auth/me and /auth/activate so an expired member can still see
+    their status and redeem an activation code without first being locked out.
+    """
+    header_token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else None
+    tokens = [token for token in (header_token, auth_cookie, admin_cookie) if token]
+    for token in tokens:
+        signed_user = remembered_user(token, db, require_access=False)
+        if signed_user:
+            return signed_user
+    if not tokens:
+        user = remembered_user(remember_cookie, db, require_access=False)
+        if user:
+            return user
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请先登录")
+    for token in tokens:
+        candidate = db.scalar(select(SessionToken).where(SessionToken.token_hash == digest(token)))
+        if candidate and as_utc(candidate.expires_at) >= now():
+            candidate_user = db.get(User, candidate.user_id)
+            if candidate_user:
+                return candidate_user
+        admin_session = db.scalar(select(AdminSession).where(AdminSession.token_hash == digest(token)))
+        if admin_session and as_utc(admin_session.expires_at) >= now():
+            candidate_user = db.get(User, admin_session.user_id) if admin_session.user_id else None
+            if candidate_user and candidate_user.is_admin:
+                return candidate_user
+    user = remembered_user(remember_cookie, db, require_access=False)
+    if user:
+        return user
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录已过期")
+
+
 def current_admin(authorization: Annotated[str | None, Header()] = None, admin_cookie: Annotated[str | None, Cookie(alias=ADMIN_COOKIE)] = None, auth_cookie: Annotated[str | None, Cookie(alias=AUTH_COOKIE)] = None, db: Session = Depends(db_session)) -> AdminSession | SessionToken:
     header_token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else None
     tokens = [token for token in (header_token, admin_cookie, auth_cookie) if token]
@@ -459,6 +522,7 @@ def activation_code_payload(record: ActivationCode) -> dict:
     duration_labels = {30: "一个月", 180: "半年", 365: "一年", None: "永久"}
     return {
         "id": record.id,
+        "code": record.code_plain,
         "code_hint": record.code_hint,
         "duration": duration_labels.get(record.grant_days, f"{record.grant_days}天"),
         "grant_days": record.grant_days,
@@ -612,9 +676,17 @@ def register(payload: RegisterRequest, db: Session = Depends(db_session)) -> dic
     }
 
 
-@app.get("/api/auth/activate")
-def activate() -> None:
-    raise HTTPException(status_code=403, detail="账号需由管理员激活")
+@app.post("/api/auth/activate", dependencies=[Depends(csrf_protect)])
+def activate_account(payload: ActivateRequest, user: User = Depends(current_user_lenient), db: Session = Depends(db_session)) -> dict:
+    record = db.scalar(select(ActivationCode).where(ActivationCode.code_hash == digest(payload.activation_code.strip().upper())))
+    if not record or record.used_at or as_utc(record.expires_at) < now():
+        raise HTTPException(status_code=400, detail="激活码无效、已使用或已过期")
+    user.activation_expires_at = None if record.grant_days is None else now() + timedelta(days=record.grant_days)
+    user.is_active = True
+    record.used_at = now()
+    record.used_by = user.id
+    db.commit()
+    return {"message": "激活成功", **user_payload(user)}
 
 
 @app.post("/api/auth/login", dependencies=[Depends(csrf_protect)])
@@ -623,8 +695,8 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(db_se
     user = db.scalar(select(User).where(User.email == email))
     if not user or not check_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="邮箱或密码错误")
-    if not user_has_access(user):
-        raise HTTPException(status_code=403, detail="账号使用权已过期，请使用激活码或联系管理员")
+    # Allow expired members to sign in so they can reach the renewal card on
+    # the account page. Privileged actions still go through current_user.
     expires_at = now() + timedelta(days=SESSION_DAYS)
     # The signed cookie is the primary session, mirroring the persistent Flask
     # session used by the reference project. No database session row is needed
@@ -637,7 +709,7 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(db_se
 
 
 @app.get("/api/auth/me")
-def me(response: Response, user: User = Depends(current_user)) -> dict:
+def me(response: Response, user: User = Depends(current_user_lenient)) -> dict:
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     expires_at = now() + timedelta(days=SESSION_DAYS)
     response.set_cookie(AUTH_COOKIE, remember_token(user, expires_at), httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
@@ -754,15 +826,38 @@ def admin_users(_: AdminSession = Depends(current_admin), db: Session = Depends(
     }
 
 
+@app.post("/api/admin/users", dependencies=[Depends(csrf_protect)])
+def admin_create_user(payload: AdminCreateUserRequest, _: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
+    email = str(payload.email).lower()
+    if db.scalar(select(User).where(User.email == email)):
+        raise HTTPException(status_code=409, detail="邮箱已注册")
+    activation_expires_at = None if payload.duration == "permanent" else now() + timedelta(days=DURATION_GRANT_DAYS[payload.duration])
+    user = User(email=email, password_hash=hash_password(payload.password), is_active=True, activation_expires_at=activation_expires_at, is_admin=False)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user_payload(user)
+
+
 @app.patch("/api/admin/users/{user_id}", dependencies=[Depends(csrf_protect)])
-def admin_update_user(user_id: int, payload: UserStatusRequest, _: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
+def admin_update_user(user_id: int, payload: AdminUpdateUserRequest, _: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    user.is_active = payload.is_active
-    user.activation_expires_at = None
-    if not payload.is_active:
+    if payload.password:
+        user.password_hash = hash_password(payload.password)
         db.query(SessionToken).filter(SessionToken.user_id == user.id).delete()
+    if payload.duration:
+        if payload.duration == "expired":
+            user.activation_expires_at = now() - timedelta(days=1)
+        elif payload.duration == "permanent":
+            user.activation_expires_at = None
+        else:
+            user.activation_expires_at = now() + timedelta(days=DURATION_GRANT_DAYS[payload.duration])
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+        if not payload.is_active:
+            db.query(SessionToken).filter(SessionToken.user_id == user.id).delete()
     db.commit()
     return user_payload(user)
 
@@ -788,6 +883,7 @@ def create_activation_code(payload: ActivationCodeRequest, _: AdminSession = Dep
     raw_code = f"FC-{secrets.token_hex(6).upper()}"
     record = ActivationCode(
         code_hash=digest(raw_code),
+        code_plain=raw_code,
         code_hint=f"...{raw_code[-4:]}",
         expires_at=now() + timedelta(hours=payload.expires_hours),
         grant_days=grant_days,
