@@ -843,7 +843,7 @@
         <div id="authMember" class="hidden">
           <div class="account-profile"><div class="account-identity"><div class="account-avatar">◎</div><div><div class="account-email" id="accountEmail">--</div><div class="account-plan" id="accountPlan">正在读取授权状态…</div></div></div><button class="btn danger" id="logoutBtn" type="button">退出登录</button></div>
           <section class="account-section"><div class="account-section-head"><div><h3>下注概览</h3><p class="panel-sub">记录你的赛前下注；赛果同步后会自动结算。</p></div></div><div class="summary-grid" id="betSummary"></div></section>
-          <div class="account-grid"><section class="account-section account-records"><div class="account-section-head"><div><h3>我的执行记录</h3><p class="panel-sub">最近保存的计划与结算结果</p></div><button class="btn" id="refreshBetsBtn" type="button">刷新</button></div><div class="history-list" id="betList"></div></section><section class="account-section account-record-form"><div class="account-section-head"><div><h3>新增执行记录</h3><p class="panel-sub" id="recordMatchInfo">请先在赛事列表中选择一场比赛。</p></div></div><form class="manual-form" id="betForm"><label>足彩玩法<select class="select" id="betPlayType"><option value="spf">胜平负</option><option value="rqspf">让球胜平负</option><option value="bf">比分</option><option value="zjq">总进球</option><option value="bqc">半全场</option></select></label><label>投注选项<select class="select" id="betSelection"></select></label><label class="hidden" id="betHandicapWrap">让球数<input class="input" id="betHandicap" type="number" step="0.5" min="-10" max="10"></label><div class="control-row"><label>参考赔率<input class="input" id="betOdds" type="number" min="1.01" step="0.01" required></label><label>金额<input class="input" id="betStake" type="number" min="0.01" step="0.01" required></label></div><button class="btn primary" type="submit">保存这条记录</button></form><div class="panel-sub" id="betMessage" style="margin-top:10px"></div></section></div>
+          <div class="account-grid"><section class="account-section account-records"><div class="account-section-head"><div><h3>我的下注记录</h3><p class="panel-sub">最近保存的计划与结算结果</p></div><button class="btn" id="refreshBetsBtn" type="button">刷新</button></div><div class="history-list" id="betList"></div></section><section class="account-section account-record-form"><div class="account-section-head"><div><h3>新增下注记录</h3><p class="panel-sub" id="recordMatchInfo">请先在赛事列表中选择一场比赛。</p></div></div><form class="manual-form" id="betForm"><label>足彩玩法<select class="select" id="betPlayType"><option value="spf">胜平负</option><option value="rqspf">让球胜平负</option><option value="bf">比分</option><option value="zjq">总进球</option><option value="bqc">半全场</option></select></label><label>投注选项<select class="select" id="betSelection"></select></label><label class="hidden" id="betHandicapWrap">让球数<input class="input" id="betHandicap" type="number" step="0.5" min="-10" max="10"></label><div class="control-row"><label>参考赔率<input class="input" id="betOdds" type="number" min="1.01" step="0.01" required></label><label>金额<input class="input" id="betStake" type="number" min="0.01" step="0.01" required></label></div><button class="btn primary" type="submit">保存这条记录</button></form><div class="panel-sub" id="betMessage" style="margin-top:10px"></div></section></div>
         </div>
         <div class="message" id="authMessage"></div>
         </div>
@@ -980,6 +980,12 @@
     }
 
     function openAdminLayer() {
+      // Open the admin console in a new tab so the event hub stays open behind
+      // it; this entry is only shown to signed-in admins, so a peek into the
+      // console shouldn't replace the hub. Fall back to same-tab navigation if
+      // the browser blocks the popup.
+      const popup = window.open("/admin.html", "_blank");
+      if (popup) return;
       location.href = "/admin.html";
     }
 
@@ -1025,6 +1031,14 @@
     }
 
     function openAccountLayer() {
+      // Signed-in members open the user center in a new tab so the event hub
+      // stays open behind it (no back button needed on account.html). When
+      // signed out, keep the same-tab flow so the login redirect lands back on
+      // the hub instead of stranding the original tab.
+      if (state.user) {
+        const popup = window.open("/account.html", "_blank");
+        if (popup) return;
+      }
       location.href = "/account.html";
     }
 
@@ -1098,7 +1112,7 @@
         $("betSummary").innerHTML = [
           ["记录", summary.count], ["待结算", summary.pending], ["胜 / 负", `${summary.won} / ${summary.lost}`], ["累计盈利", summary.profit.toFixed(2)]
         ].map(([label, value]) => `<div class="summary-item"><span>${label}</span><b>${escapeHtml(value)}</b></div>`).join("");
-        $("betList").innerHTML = records.items.length ? records.items.map(renderBetRecord).join("") : '<div class="panel-sub">还没有执行记录。</div>';
+        $("betList").innerHTML = records.items.length ? records.items.map(renderBetRecord).join("") : '<div class="panel-sub">还没有下注记录。</div>';
       } catch (error) { setBetMessage(error.message); }
     }
 

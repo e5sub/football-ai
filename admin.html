@@ -124,7 +124,7 @@
     <div class="admin-content">
       <header class="topbar">
         <div class="brand"><div class="mark">AI</div><div><div class="eyebrow">Operations center</div><h1>管理后台</h1><p class="sub">用户授权、激活码与赛事更新</p></div></div>
-        <div class="header-actions"><button class="btn" id="refreshBtn" type="button">刷新数据</button><button class="btn" id="backBtn" type="button">返回首页</button></div>
+        <div class="header-actions"><button class="btn" id="refreshBtn" type="button">刷新数据</button></div>
       </header>
       <section class="main">
         <div class="stats">
@@ -237,7 +237,7 @@
     async function logout(){clearTimeout(state.updateTimer);try{await request('/auth/logout',{method:'POST',body:'{}'})}catch(e){}localStorage.removeItem('football_ai_admin_session');localStorage.removeItem('football_ai_session');location.href='/login.html'}
     async function init(){await csrf();$('codeDuration').innerHTML=durationPickerHTML('month');bindDurationPicker($('codeDuration'));await load();$('panel').style.display=''}
 
-    $('backBtn').onclick=()=>location.href='/';$('refreshBtn').onclick=load;
+    $('refreshBtn').onclick=load;
     $('userSearch').oninput=render;$('codeSearch').oninput=render;
     $('addUserBtn').onclick=openAddUser;
     document.querySelectorAll('.admin-nav-item').forEach(b=>b.addEventListener('click',()=>setAdminView(b.dataset.view)));

@@ -74,8 +74,8 @@
 <body>
   <main class="shell">
     <header class="topbar">
-      <div class="brand"><div class="mark">AI</div><div><div class="eyebrow">Member center</div><h1>用户中心</h1><p class="sub">账号状态与个人执行记录</p></div></div>
-      <div class="actions"><button class="btn" id="homeBtn" type="button">返回赛事</button><button class="btn hidden" id="adminBtn" type="button">管理后台</button></div>
+      <div class="brand"><div class="mark">AI</div><div><div class="eyebrow">Member center</div><h1>用户中心</h1><p class="sub">账号状态与个人下注记录</p></div></div>
+      <div class="actions"><button class="btn hidden" id="adminBtn" type="button">管理后台</button></div>
     </header>
     <section class="main" id="content" style="display:none">
       <section class="card profile">
@@ -88,13 +88,13 @@
         <p class="renew-notice" id="renewNotice"></p>
       </section>
       <section class="stats">
-        <div class="stat"><span>执行记录</span><b id="count">--</b></div>
+        <div class="stat"><span>下注记录</span><b id="count">--</b></div>
         <div class="stat"><span>待结算</span><b id="pending">--</b></div>
         <div class="stat"><span>胜 / 负</span><b id="winLoss">--</b></div>
         <div class="stat"><span>累计盈亏</span><b id="profit">--</b></div>
       </section>
       <section class="card">
-        <div class="card-head"><div><h2>我的执行记录</h2><p class="hint">在赛事页面选择比赛后可新增执行记录，赛果同步后会自动结算。</p></div><button class="btn" id="refreshBtn" type="button">刷新记录</button></div>
+        <div class="card-head"><div><h2>我的下注记录</h2><p class="hint">在赛事页面选择比赛后可新增下注记录，赛果同步后会自动结算。</p></div><button class="btn" id="refreshBtn" type="button">刷新记录</button></div>
         <div class="records" id="records"></div>
         <p class="notice" id="notice"></p>
       </section>
@@ -117,7 +117,7 @@
     function selection(b){const labels={home:'主胜',draw:'平局',away:'客胜','home/home':'胜胜','home/draw':'胜平','home/away':'胜负','draw/home':'平胜','draw/draw':'平平','draw/away':'平负','away/home':'负胜','away/draw':'负平','away/away':'负负'};return labels[b.selection]||b.selection}
     function renderRecords(items){
       const play={spf:'胜平负',rqspf:'让球胜平负',bf:'比分',zjq:'总进球',bqc:'半全场'},status={pending:'待结算',won:'已命中',lost:'未命中'};
-      $('records').innerHTML=items.length?items.map(b=>`<article class="record"><div><b>${escapeHtml(b.match_id)}</b><small>${play[b.play_type]||b.play_type} · ${escapeHtml(selection(b))}${b.handicap===null||b.handicap===undefined?'':` · 让${b.handicap}`} · 赔率 ${b.odds} · 金额 ${b.stake}</small></div><div class="result ${b.status==='won'?'ok':b.status==='lost'?'no':''}">${status[b.status]||b.status}<small>${b.profit===null?'--':Number(b.profit).toFixed(2)}</small></div></article>`).join(''):'<div class="empty"><svg class="empty-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg><b>还没有执行记录</b><small>回到赛事页选择比赛后即可添加</small></div>';
+      $('records').innerHTML=items.length?items.map(b=>`<article class="record"><div><b>${escapeHtml(b.match_id)}</b><small>${play[b.play_type]||b.play_type} · ${escapeHtml(selection(b))}${b.handicap===null||b.handicap===undefined?'':` · 让${b.handicap}`} · 赔率 ${b.odds} · 金额 ${b.stake}</small></div><div class="result ${b.status==='won'?'ok':b.status==='lost'?'no':''}">${status[b.status]||b.status}<small>${b.profit===null?'--':Number(b.profit).toFixed(2)}</small></div></article>`).join(''):'<div class="empty"><svg class="empty-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg><b>还没有下注记录</b><small>回到赛事页选择比赛后即可添加</small></div>';
     }
 
     async function load(){
@@ -142,7 +142,6 @@
       }catch(e){if([401,403].includes(e.status)){localStorage.removeItem('football_ai_session');location.href='/login.html'}else $('notice').textContent=e.message}
     }
 
-    $('homeBtn').onclick=()=>location.href='/';
     $('adminBtn').onclick=()=>location.href='/admin.html';
     $('refreshBtn').onclick=load;
     $('logoutBtn').onclick=async()=>{try{await api('/auth/logout',{method:'POST',body:'{}'})}catch(e){}localStorage.removeItem('football_ai_session');localStorage.removeItem('football_ai_admin_session');location.href='/login.html'};

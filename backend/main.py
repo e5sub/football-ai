@@ -1062,7 +1062,20 @@ def settle_get(x_admin_key: Annotated[str | None, Header()] = None, db: Session 
 
 
 @app.get("/", include_in_schema=False)
-def index() -> FileResponse:
+def index(auth_cookie: Annotated[str | None, Cookie(alias=AUTH_COOKIE)] = None, remember_cookie: Annotated[str | None, Cookie(alias=REMEMBER_COOKIE)] = None) -> Response:
+    # Members whose access has expired are confined to the account page, where
+    # they can redeem an activation code; everyone else sees the event hub.
+    if auth_cookie or remember_cookie:
+        db = SessionLocal()
+        try:
+            for token in (auth_cookie, remember_cookie):
+                if not token:
+                    continue
+                user = remembered_user(token, db, require_access=False)
+                if user and not user_has_access(user):
+                    return RedirectResponse("/account.html", status_code=303)
+        finally:
+            db.close()
     return FileResponse(ROOT / "index.html", headers={"Cache-Control": "no-cache"})
 
 
