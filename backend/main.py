@@ -14,6 +14,7 @@ from binascii import Error as BinasciiError
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Literal
+from urllib.parse import urlparse
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,6 +33,7 @@ except ImportError:
     pass
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{ROOT / 'football_ai.db'}")
 SESSION_DAYS = int(os.getenv("SESSION_DAYS", "365"))
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip()
 
 engine_options = {"pool_pre_ping": True}
 if DATABASE_URL.startswith("sqlite"):
@@ -327,11 +329,22 @@ def db_session():
 
 
 def csrf_protect(
+    request: Request,
     csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
     csrf_cookie: Annotated[str | None, Cookie(alias=CSRF_COOKIE)] = None,
 ) -> None:
-    if not csrf_header or not csrf_cookie or not hmac.compare_digest(csrf_header, csrf_cookie):
-        raise HTTPException(status_code=403, detail="CSRF token 无效或缺失")
+    if csrf_header and csrf_cookie and hmac.compare_digest(csrf_header, csrf_cookie):
+        return
+
+    # Some CDNs intentionally remove or do not forward Set-Cookie/Cookie on
+    # uncached API routes. For same-origin browser requests, Origin validation
+    # provides a safe fallback without weakening cross-site request protection.
+    origin = urlparse(request.headers.get("origin", ""))
+    configured_origin = urlparse(PUBLIC_BASE_URL)
+    allowed_hosts = {host for host in (request.headers.get("host", "").lower(), configured_origin.netloc.lower()) if host}
+    if origin.scheme in {"http", "https"} and origin.netloc.lower() in allowed_hosts:
+        return
+    raise HTTPException(status_code=403, detail="CSRF token 无效或缺失")
 
 
 def user_has_access(user: User) -> bool:
@@ -552,7 +565,7 @@ def match_latest_odds(match_id: str, play_type: str = "spf", db: Session = Depen
 def csrf_token(response: Response) -> dict:
     token = secrets.token_urlsafe(32)
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    response.set_cookie(CSRF_COOKIE, token, httponly=False, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="strict", max_age=86400)
+    response.set_cookie(CSRF_COOKIE, token, httponly=False, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="strict", max_age=86400, path="/")
     return {"csrf_token": token}
 
 
