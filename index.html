@@ -902,6 +902,7 @@
 
     const DATA_CACHE_KEY = "football_ai_remote_data_cache_v3";
     const ARCHIVE_CACHE_KEY = "football_ai_archive_cache_v2";
+    const LIVE_REFRESH_INTERVAL = 60 * 1000;
     const state = { data: FALLBACK_DATA, matches: [], manualMatches: [], fixtureCatalog: null, catalogPromise: null, activeId: "", archive: [], archiveLoaded: false, authToken: localStorage.getItem("football_ai_session") || "", user: null, adminToken: localStorage.getItem("football_ai_admin_session") || "", csrfToken: "" };
 
     const $ = (id) => document.getElementById(id);
@@ -924,6 +925,7 @@
       await loadData();
       updateAdminVisibility();
       renderAll();
+      startLiveRefresh();
     }
 
     function bindEvents() {
@@ -995,6 +997,27 @@
       await loadData();
       updateAdminVisibility();
       renderAll();
+      startLiveRefresh();
+    }
+
+    let liveRefreshTimer = null;
+    function startLiveRefresh() {
+      if (liveRefreshTimer) return;
+      liveRefreshTimer = setInterval(refreshLiveData, LIVE_REFRESH_INTERVAL);
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) refreshLiveData();
+      });
+    }
+
+    async function refreshLiveData() {
+      if (!state.user || document.hidden) return;
+      try {
+        await loadData();
+        renderAll();
+        if (state.archiveLoaded) state.archiveLoaded = false;
+      } catch (error) {
+        console.warn("赛事数据自动刷新失败", error);
+      }
     }
 
     async function loginGate(event) {

@@ -327,7 +327,9 @@ def health() -> dict:
 
 
 @app.get("/api/data/matches")
-def data_matches(db: Session = Depends(db_session)) -> dict:
+def data_matches(response: Response, db: Session = Depends(db_session)) -> dict:
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
     snapshot = db.get(DataSnapshot, "matches")
     if snapshot:
         return snapshot.payload
