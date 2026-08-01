@@ -169,22 +169,14 @@ REMEMBER_COOKIE = "football_ai_remember"
 
 
 def load_auth_signing_secret() -> str:
-    """Keep cookie signatures stable across container restarts and redeploys."""
+    """Keep cookie signatures identical across restarts and all app replicas."""
     configured_secret = os.getenv("AUTH_SECRET_KEY", "").strip()
     if configured_secret:
         return configured_secret
-    secret_path = ROOT / "logs" / "auth_signing_secret.key"
-    try:
-        secret_path.parent.mkdir(parents=True, exist_ok=True)
-        if secret_path.exists():
-            persisted_secret = secret_path.read_text(encoding="utf-8").strip()
-            if persisted_secret:
-                return persisted_secret
-        generated_secret = secrets.token_hex(32)
-        secret_path.write_text(generated_secret, encoding="utf-8")
-        return generated_secret
-    except OSError:
-        return hashlib.sha256(f"football-ai:{DATABASE_URL}".encode("utf-8")).hexdigest()
+    # All replicas receive the same DATABASE_URL. This fallback is therefore
+    # deterministic, unlike a per-container generated file which would cause
+    # a signed cookie from instance A to be rejected by instance B.
+    return hashlib.sha256(f"football-ai:session-signing:{DATABASE_URL}".encode("utf-8")).hexdigest()
 
 
 AUTH_SIGNING_SECRET = load_auth_signing_secret()
