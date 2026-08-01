@@ -59,6 +59,8 @@ ghcr.io/<GitHub用户名或组织>/ai-football:latest
 
 GitHub Actions 不运行数据抓取和数据库同步，只负责构建镜像。数据更新在本地执行，本地脚本会同时更新 JSON 和 MySQL；JSON 仍会提交到 GitHub 做备份，但仅修改 `data/` 的提交不会触发镜像构建。修改代码、Docker 配置或推送版本 tag 时才会构建 GHCR 镜像。
 
+赛事更新日志会写入 `logs/data_update.log`，管理员后台同时显示最近一次任务的状态、耗时和脚本输出。使用 Docker Compose 时，`logs/` 会挂载到容器外，重启容器不会丢失日志。
+
 ### 本地更新数据
 
 复制 `.env.example` 为 `.env`，填写本机可访问的 MySQL 地址，然后安装依赖并运行：

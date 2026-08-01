@@ -9,4 +9,6 @@ services:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
     ports:
       - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
     restart: unless-stopped

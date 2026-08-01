@@ -152,7 +152,16 @@ AUTH_COOKIE = "football_ai_auth"
 ADMIN_COOKIE = "football_ai_admin"
 DATA_UPDATE_LOCK = threading.Lock()
 DATA_UPDATE_STATUS_LOCK = threading.Lock()
-DATA_UPDATE_STATUS = {"running": False, "message": "", "output": ""}
+DATA_UPDATE_LOG = ROOT / "logs" / "data_update.log"
+DATA_UPDATE_STATUS = {"running": False, "message": "", "output": "", "started_at": None, "finished_at": None, "duration_seconds": None}
+
+
+def write_update_log(message: str, output: str = "") -> None:
+    DATA_UPDATE_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with DATA_UPDATE_LOG.open("a", encoding="utf-8") as log_file:
+        log_file.write(f"[{now().isoformat()}] {message}\n")
+        if output:
+            log_file.write(f"{output[-4000:]}\n")
 
 
 class RegisterRequest(BaseModel):
@@ -495,7 +504,8 @@ def admin_update_data(_: AdminSession = Depends(current_admin)) -> dict:
     with DATA_UPDATE_STATUS_LOCK:
         if DATA_UPDATE_STATUS["running"]:
             raise HTTPException(status_code=409, detail="赛事数据更新正在进行中，请稍后查看")
-        DATA_UPDATE_STATUS.update(running=True, message="赛事数据更新已在后台启动", output="")
+        DATA_UPDATE_STATUS.update(running=True, message="赛事数据更新已在后台启动", output="", started_at=now().isoformat(), finished_at=None, duration_seconds=None)
+    write_update_log("赛事数据更新启动")
     threading.Thread(target=run_data_update, daemon=True).start()
     return {"status": "started", "message": "赛事数据更新已在后台启动，请稍后查看结果"}
 
@@ -503,7 +513,7 @@ def admin_update_data(_: AdminSession = Depends(current_admin)) -> dict:
 def run_data_update() -> None:
     if not DATA_UPDATE_LOCK.acquire(blocking=False):
         with DATA_UPDATE_STATUS_LOCK:
-            DATA_UPDATE_STATUS.update(running=False, message="赛事数据更新正在进行中，请稍后查看", output="")
+            DATA_UPDATE_STATUS.update(running=False, message="赛事数据更新正在进行中，请稍后查看", output="", finished_at=now().isoformat())
         return
     try:
         result = subprocess.run(
@@ -516,18 +526,29 @@ def run_data_update() -> None:
             check=False,
         )
         output = (result.stdout or result.stderr or "").strip()
+        finished_at = now()
+        with DATA_UPDATE_STATUS_LOCK:
+            started_at = DATA_UPDATE_STATUS.get("started_at")
+        duration = None
+        if started_at:
+            duration = round((finished_at - datetime.fromisoformat(started_at)).total_seconds(), 2)
         with DATA_UPDATE_STATUS_LOCK:
             DATA_UPDATE_STATUS.update(
                 running=False,
                 message="赛事数据更新完成" if result.returncode == 0 else "赛事数据更新失败",
                 output=output[-4000:],
+                finished_at=finished_at.isoformat(),
+                duration_seconds=duration,
             )
+        write_update_log(DATA_UPDATE_STATUS["message"], output)
     except subprocess.TimeoutExpired:
         with DATA_UPDATE_STATUS_LOCK:
-            DATA_UPDATE_STATUS.update(running=False, message="赛事数据更新超过 30 分钟，任务已终止", output="")
+            DATA_UPDATE_STATUS.update(running=False, message="赛事数据更新超过 30 分钟，任务已终止", output="", finished_at=now().isoformat())
+        write_update_log("赛事数据更新超时")
     except Exception as exc:
         with DATA_UPDATE_STATUS_LOCK:
-            DATA_UPDATE_STATUS.update(running=False, message=f"赛事数据更新失败：{exc}", output="")
+            DATA_UPDATE_STATUS.update(running=False, message=f"赛事数据更新失败：{exc}", output="", finished_at=now().isoformat())
+        write_update_log("赛事数据更新异常", repr(exc))
     finally:
         DATA_UPDATE_LOCK.release()
 
