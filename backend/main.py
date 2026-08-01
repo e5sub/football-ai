@@ -9,6 +9,8 @@ import re
 import subprocess
 import sys
 import threading
+from base64 import urlsafe_b64decode, urlsafe_b64encode
+from binascii import Error as BinasciiError
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Literal
@@ -150,6 +152,29 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
 CSRF_COOKIE = "football_ai_csrf"
 AUTH_COOKIE = "football_ai_auth"
 ADMIN_COOKIE = "football_ai_admin"
+REMEMBER_COOKIE = "football_ai_remember"
+
+
+def load_auth_signing_secret() -> str:
+    """Keep cookie signatures stable across container restarts and redeploys."""
+    configured_secret = os.getenv("AUTH_SECRET_KEY", "").strip()
+    if configured_secret:
+        return configured_secret
+    secret_path = ROOT / "logs" / "auth_signing_secret.key"
+    try:
+        secret_path.parent.mkdir(parents=True, exist_ok=True)
+        if secret_path.exists():
+            persisted_secret = secret_path.read_text(encoding="utf-8").strip()
+            if persisted_secret:
+                return persisted_secret
+        generated_secret = secrets.token_hex(32)
+        secret_path.write_text(generated_secret, encoding="utf-8")
+        return generated_secret
+    except OSError:
+        return hashlib.sha256(f"football-ai:{DATABASE_URL}".encode("utf-8")).hexdigest()
+
+
+AUTH_SIGNING_SECRET = load_auth_signing_secret()
 DATA_UPDATE_LOCK = threading.Lock()
 DATA_UPDATE_STATUS_LOCK = threading.Lock()
 DATA_UPDATE_LOG = ROOT / "logs" / "data_update.log"
@@ -249,6 +274,30 @@ def digest(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def remember_token(user: User, expires_at: datetime) -> str:
+    """Create a tamper-proof cookie that is invalidated when password changes."""
+    payload = f"{user.id}:{int(as_utc(expires_at).timestamp())}:{digest(user.password_hash)}"
+    signature = hmac.new(AUTH_SIGNING_SECRET.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return urlsafe_b64encode(f"{payload}:{signature}".encode("utf-8")).decode("ascii")
+
+
+def remembered_user(token: str | None, db: Session) -> User | None:
+    if not token:
+        return None
+    try:
+        payload, signature = urlsafe_b64decode(token.encode("ascii")).decode("utf-8").rsplit(":", 1)
+        expected = hmac.new(AUTH_SIGNING_SECRET.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        user_id, expires_at, password_fingerprint = payload.split(":", 2)
+        if not hmac.compare_digest(signature, expected) or int(expires_at) < int(now().timestamp()):
+            return None
+        user = db.get(User, int(user_id))
+        if not user or not hmac.compare_digest(password_fingerprint, digest(user.password_hash)) or not user_has_access(user):
+            return None
+        return user
+    except (BinasciiError, ValueError, UnicodeDecodeError, TypeError):
+        return None
+
+
 def hash_password(password: str, salt: bytes | None = None) -> str:
     salt = salt or secrets.token_bytes(16)
     derived = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 240_000)
@@ -288,11 +337,15 @@ def current_user(
     authorization: Annotated[str | None, Header()] = None,
     auth_cookie: Annotated[str | None, Cookie(alias=AUTH_COOKIE)] = None,
     admin_cookie: Annotated[str | None, Cookie(alias=ADMIN_COOKIE)] = None,
+    remember_cookie: Annotated[str | None, Cookie(alias=REMEMBER_COOKIE)] = None,
     db: Session = Depends(db_session),
 ) -> User:
     header_token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else None
     tokens = [token for token in (header_token, auth_cookie, admin_cookie) if token]
     if not tokens:
+        user = remembered_user(remember_cookie, db)
+        if user:
+            return user
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请先登录")
     session_token = None
     user = None
@@ -312,7 +365,9 @@ def current_user(
             if candidate_user and candidate_user.is_admin and user_has_access(candidate_user):
                 session_token, user = admin_session, candidate_user
                 break
-    if not session_token or not user:
+    if not user:
+        user = remembered_user(remember_cookie, db)
+    if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录已过期")
     # The browser token already has the same fixed lifetime.  Avoid writing on
     # every authenticated GET: a transient database write failure here used to
@@ -493,6 +548,7 @@ def csrf_token(response: Response) -> dict:
 def logout(response: Response) -> dict:
     response.delete_cookie(AUTH_COOKIE, path="/")
     response.delete_cookie(ADMIN_COOKIE, path="/")
+    response.delete_cookie(REMEMBER_COOKIE, path="/")
     return {"message": "已退出登录"}
 
 
@@ -545,16 +601,20 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(db_se
     if not user_has_access(user):
         raise HTTPException(status_code=403, detail="账号使用权已过期，请使用激活码或联系管理员")
     raw_token = secrets.token_urlsafe(32)
-    db.add(SessionToken(user_id=user.id, token_hash=digest(raw_token), expires_at=now() + timedelta(days=SESSION_DAYS)))
+    expires_at = now() + timedelta(days=SESSION_DAYS)
+    db.add(SessionToken(user_id=user.id, token_hash=digest(raw_token), expires_at=expires_at))
     db.commit()
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.set_cookie(AUTH_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
+    response.set_cookie(REMEMBER_COOKIE, remember_token(user, expires_at), httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     return {"token": raw_token, "user": user_payload(user)}
 
 
 @app.get("/api/auth/me")
 def me(response: Response, user: User = Depends(current_user)) -> dict:
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    expires_at = now() + timedelta(days=SESSION_DAYS)
+    response.set_cookie(REMEMBER_COOKIE, remember_token(user, expires_at), httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     return user_payload(user)
 
 
@@ -572,6 +632,7 @@ def admin_login(payload: AdminLoginRequest, response: Response, db: Session = De
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.set_cookie(ADMIN_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     response.set_cookie(AUTH_COOKIE, user_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
+    response.set_cookie(REMEMBER_COOKIE, remember_token(user, expires_at), httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     return {"token": raw_token, "user_token": user_token, "expires_in_days": SESSION_DAYS, "user": user_payload(user)}
 
 
