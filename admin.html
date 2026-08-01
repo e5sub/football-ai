@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>管理员后台 - AI足球赛事研判指挥舱</title>
+  <style>
+    :root { --bg:#070b12; --panel:#0d141e; --panel2:#111a26; --line:rgba(140,162,190,.2); --text:#eef5ff; --muted:#91a2b7; --cyan:#32d5ff; --green:#33e6a6; --amber:#ffc857; --red:#ff637d; --shadow:0 20px 60px rgba(0,0,0,.38); font-family:"Microsoft YaHei",system-ui,sans-serif; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; color:var(--text); background:radial-gradient(circle at 8% 0%,rgba(50,213,255,.12),transparent 34%),radial-gradient(circle at 92% 18%,rgba(255,200,87,.08),transparent 28%),var(--bg); }
+    button,input,select { font:inherit; color:inherit; }
+    button { border:0; cursor:pointer; }
+    .hidden { display:none!important; }
+    .shell { width:min(1240px,100%); min-height:100vh; margin:auto; padding:24px; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:10px 0 24px; border-bottom:1px solid var(--line); }
+    .brand,.actions,.stats,.tools { display:flex; align-items:center; gap:10px; }
+    .brand-mark { width:42px;height:42px;display:grid;place-items:center;border:1px solid rgba(50,213,255,.55);border-radius:8px;color:var(--cyan);background:rgba(50,213,255,.1);font-weight:900; }
+    .eyebrow { color:var(--cyan);font:800 11px/1.2 Consolas,monospace;letter-spacing:.08em;text-transform:uppercase; }
+    h1,h2,h3,p { margin:0; }
+    h2 { margin-top:4px;font-size:24px; }
+    .sub,.note { color:var(--muted);font-size:12px;line-height:1.6; }
+    .badge,.btn,.select,.input { border:1px solid var(--line);border-radius:6px;background:rgba(255,255,255,.05); }
+    .badge { padding:9px 11px;font-size:12px;white-space:nowrap; }
+    .dot { display:inline-block;width:7px;height:7px;margin-right:6px;border-radius:50%;background:var(--green); }
+    .btn { min-height:38px;padding:0 14px;transition:.15s; }
+    .btn:hover { border-color:rgba(50,213,255,.6);background:rgba(50,213,255,.1);transform:translateY(-1px); }
+    .btn.primary { border-color:rgba(50,213,255,.58);background:linear-gradient(135deg,rgba(50,213,255,.25),rgba(51,230,166,.14)); }
+    .hero { display:flex;align-items:end;justify-content:space-between;gap:20px;padding:30px 0 22px; }
+    .hero h1 { margin-top:8px;font-size:clamp(28px,4vw,46px);line-height:1; }
+    .hero p { max-width:620px;margin-top:12px;color:var(--muted);line-height:1.6; }
+    .stats { min-width:min(420px,100%); }
+    .stat,.card { border:1px solid var(--line);border-radius:8px;background:rgba(13,20,30,.88);box-shadow:var(--shadow); }
+    .stat { flex:1;padding:14px;background:rgba(255,255,255,.045); }
+    .stat span { display:block;color:var(--muted);font-size:11px; }
+    .stat b { display:block;margin-top:8px;font-size:25px; }
+    .workspace { display:grid;grid-template-columns:minmax(0,1.4fr) minmax(300px,.6fr);gap:14px; }
+    .card { min-width:0;padding:16px; }
+    .card-head { display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px; }
+    h3 { font-size:16px; }
+    .tools { display:grid;grid-template-columns:minmax(0,1fr) auto auto; }
+    .input,.select { width:100%;height:38px;padding:0 10px;background:rgba(5,10,16,.86);outline:0; }
+    .list { display:grid;gap:7px;max-height:430px;overflow:auto; }
+    .row { display:grid;grid-template-columns:minmax(0,1.2fr) auto;gap:12px;align-items:center;padding:10px;border:1px solid rgba(255,255,255,.08);border-radius:7px;background:rgba(255,255,255,.035); }
+    .row b { display:block;font-size:13px; }.row small { display:block;margin-top:4px;color:var(--muted);font-size:11px; }
+    .status { color:var(--muted);font-size:12px;text-align:right; }.status.ok { color:var(--green); }.status.warn { color:var(--amber); }
+    .form { display:grid;gap:12px; }.form label { display:grid;gap:7px;color:#d9e7f8;font-size:13px; }
+    .message { min-height:22px;color:var(--amber);font-size:13px; }
+    .login { width:min(460px,100%);margin:14vh auto; }
+    .login .card-head { display:block; }
+    .footer-tools { display:flex;justify-content:space-between;gap:12px;align-items:end; }
+    @media(max-width:760px) { .shell{padding:12px}.topbar,.hero{align-items:flex-start;flex-direction:column}.actions,.stats,.workspace{width:100%}.stats{min-width:0}.workspace{grid-template-columns:1fr}.tools{grid-template-columns:1fr}.footer-tools{align-items:stretch;flex-direction:column}.row{grid-template-columns:1fr}.status{text-align:left} }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><div class="brand-mark">AI</div><div><div class="eyebrow">Operations / Control Room</div><h2>管理员后台</h2><p class="sub">账号授权、激活码和赛事数据的统一工作台</p></div></div>
+      <div class="actions"><span class="badge"><span class="dot"></span>管理员权限</span><button class="btn" id="backBtn" type="button">返回首页</button></div>
+    </header>
+    <section class="hero"><div><div class="eyebrow">Access overview</div><h1>权限控制台</h1><p>新用户默认获得 3 天使用权。激活码可授予一个月、半年、一年或永久权限。</p></div><div class="stats"><div class="stat"><span>用户总数</span><b id="userCount">--</b></div><div class="stat"><span>可用账号</span><b id="activeCount">--</b></div><div class="stat"><span>未使用激活码</span><b id="codeCount">--</b></div></div></section>
+    <form class="card login hidden" id="loginForm"><div class="card-head"><h3>管理员登录</h3><p class="note">验证管理员账号后进入控制台。</p></div><div class="form"><label>邮箱<input class="input" id="email" type="email" required></label><label>密码<input class="input" id="password" type="password" minlength="8" required></label><button class="btn primary" type="submit">进入后台</button></div></form>
+    <div id="panel" class="hidden">
+      <section class="card" style="margin-bottom:14px"><div class="card-head"><div><h3>快捷操作</h3><p class="note">更新赛事数据，或生成不同期限的激活码。</p></div><div class="message" id="message"></div></div><div class="tools"><button class="btn primary" id="updateBtn" type="button">更新赛事数据</button><select class="select" id="duration"><option value="month">一个月</option><option value="half_year">半年</option><option value="year">一年</option><option value="permanent">永久</option></select><button class="btn primary" id="codeBtn" type="button">生成激活码</button></div></section>
+      <div class="workspace"><section class="card"><div class="card-head"><div><h3>用户管理</h3><p class="note">点击状态按钮即可授予或收回永久使用权。</p></div></div><div class="list" id="users"></div></section><section class="card"><div class="card-head"><div><h3>激活码记录</h3><p class="note">激活码默认 72 小时内可兑换。</p></div></div><div class="list" id="codes"></div></section></div>
+      <section class="card" style="margin-top:14px"><div class="card-head"><div><h3>安全设置</h3><p class="note">重置密码后，旧的后台会话立即失效。</p></div></div><form class="form" id="passwordForm"><label>新管理员密码<input class="input" id="newPassword" type="password" minlength="8" required></label><div class="footer-tools"><button class="btn" type="submit">重置管理员密码</button><button class="btn" id="logoutBtn" type="button">退出后台</button></div></form></section>
+    </div>
+    <div class="message" id="loginMessage"></div>
+  </main>
+  <script>
+    const state={authToken:localStorage.getItem("football_ai_session")||"",adminToken:localStorage.getItem("football_ai_admin_session")||"",csrfToken:"",user:null};
+    const $=id=>document.getElementById(id);
+    const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[char]));
+    const formatDate=value=>new Date(value).toLocaleString("zh-CN",{hour12:false});
+    async function csrf(){const r=await fetch("/api/auth/csrf");state.csrfToken=(await r.json()).csrf_token||"";}
+    async function request(path,options={},preferredToken=""){const headers={"Content-Type":"application/json"};if(["POST","PATCH","DELETE"].includes(options.method))headers["X-CSRF-Token"]=state.csrfToken;const call=token=>fetch(`/api${path}`,{...options,headers:{...headers,...(token?{Authorization:`Bearer ${token}`}:{})}});let r=await call(preferredToken||state.adminToken||state.authToken);if(!r.ok&&state.adminToken&&state.authToken&&[401,403].includes(r.status))r=await call(state.authToken);const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.detail||`请求失败（HTTP ${r.status}）`);return data;}
+    function renderUser(user){const active=user.is_active;return `<div class="row"><div><b>${escapeHtml(user.email)}</b><small>ID ${user.id} · 记录 ${user.bet_count} · ${formatDate(user.created_at)}</small></div><div class="status ${active?"ok":"warn"}">${active?"正常":"未激活"}<br><button class="btn" data-user="${user.id}" data-active="${!active}" type="button">${active?"停用":"激活"}</button></div></div>`;}
+    function renderCode(code){const expired=new Date(code.expires_at)<new Date();const status=code.used_at?`已使用 · 用户 ${code.used_by}`:expired?"已过期":"未使用";return `<div class="row"><div><b>${escapeHtml(code.code_hint)}</b><small>授权时长 ${escapeHtml(code.duration)} · 有效期至 ${formatDate(code.expires_at)}</small></div><div class="status">${status}</div></div>`;}
+    async function load(){const [users,codes]=await Promise.all([request("/admin/users"),request("/admin/activation-codes")]);$("users").innerHTML=users.items.length?users.items.map(renderUser).join(""):"<p class='note'>暂无用户</p>";$("codes").innerHTML=codes.items.length?codes.items.map(renderCode).join(""):"<p class='note'>暂无激活码</p>";$('userCount').textContent=users.items.length;$('activeCount').textContent=users.items.filter(x=>x.is_active).length;$('codeCount').textContent=codes.items.filter(x=>!x.used_at&&new Date(x.expires_at)>=new Date()).length;}
+    function showPanel(){const access=Boolean(state.adminToken||state.user?.is_admin);$("loginForm").classList.toggle("hidden",access);$("panel").classList.toggle("hidden",!access);if(access)load().catch(e=>$("message").textContent=e.message);}
+    async function init(){await csrf();try{if(state.authToken)state.user=await request("/auth/me",{},state.authToken);showPanel();}catch(e){state.user=null;$("loginForm").classList.remove("hidden");$("panel").classList.add("hidden");}}
+    $("backBtn").onclick=()=>location.href="/";
+    $("loginForm").onsubmit=async e=>{e.preventDefault();try{const p=await request("/admin/login",{method:"POST",body:JSON.stringify({email:$("email").value,password:$("password").value})});state.adminToken=p.token;localStorage.setItem("football_ai_admin_session",state.adminToken);showPanel();}catch(e){$("loginMessage").textContent=e.message;}};
+    $("codeBtn").onclick=async()=>{try{const p=await request("/admin/activation-codes",{method:"POST",body:JSON.stringify({expires_hours:72,duration:$("duration").value})});$("message").textContent=`新激活码：${p.code}（仅此处显示，请复制保存）`;await load();}catch(e){$("message").textContent=e.message;}};
+    $("updateBtn").onclick=async()=>{const button=$("updateBtn");button.disabled=true;try{const p=await request("/admin/update-data",{method:"POST",body:"{}"});$("message").textContent=p.message;let status;do{await new Promise(resolve=>setTimeout(resolve,3000));status=await request("/admin/update-data/status");$("message").textContent=status.running?"赛事数据更新进行中，请稍候...":status.message;}while(status.running);await load();}catch(e){$("message").textContent=e.message;}finally{button.disabled=false;}};
+    $("users").onclick=async e=>{const b=e.target.closest("[data-user]");if(!b)return;try{await request(`/admin/users/${b.dataset.user}`,{method:"PATCH",body:JSON.stringify({is_active:b.dataset.active==="true"})});await load();}catch(err){$("message").textContent=err.message;}};
+    $("passwordForm").onsubmit=async e=>{e.preventDefault();try{$("message").textContent=(await request("/admin/password",{method:"POST",body:JSON.stringify({new_password:$("newPassword").value})})).message;logout();}catch(err){$("message").textContent=err.message;}};
+    function logout(){localStorage.removeItem("football_ai_admin_session");location.href="/";}
+    $("logoutBtn").onclick=logout;
+    init();
+  </script>
+</body>
+</html>

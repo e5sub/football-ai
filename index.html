@@ -479,32 +479,6 @@
     .history-hit.yes { color: var(--green); }
     .history-hit.secondary { color: var(--amber); }
     .history-hit.no { color: var(--red); }
-    .admin-layer { display: block; overflow-y: auto; padding: 24px; background: radial-gradient(circle at 8% 0%, rgba(50,213,255,.12), transparent 34%), radial-gradient(circle at 92% 18%, rgba(255,200,87,.08), transparent 28%), #070b12; }
-    .admin-shell { width: min(1240px, 100%); min-height: calc(100dvh - 48px); margin: 0 auto; }
-    .admin-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 10px 0 24px; border-bottom: 1px solid var(--line); }
-    .admin-brand { display: flex; align-items: center; gap: 12px; }
-    .admin-brand-mark { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid rgba(50,213,255,.55); border-radius: 8px; color: var(--cyan); background: rgba(50,213,255,.1); font-weight: 900; }
-    .admin-eyebrow { color: var(--cyan); font: 800 11px/1.2 "Cascadia Mono", Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }
-    .admin-header h2 { margin: 4px 0 0; font-size: 24px; }
-    .admin-header p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
-    .admin-header-actions { display: flex; gap: 8px; align-items: center; }
-    .admin-hero { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding: 30px 0 22px; }
-    .admin-hero h1 { margin: 0; font-size: clamp(28px, 4vw, 46px); line-height: 1; }
-    .admin-hero p { max-width: 620px; margin: 12px 0 0; color: var(--muted); line-height: 1.6; }
-    .admin-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; min-width: min(420px, 100%); }
-    .admin-stat { padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.045); }
-    .admin-stat span { display: block; color: var(--muted); font-size: 11px; }
-    .admin-stat b { display: block; margin-top: 8px; color: var(--text); font-size: 25px; }
-    .admin-workspace { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(300px, .6fr); gap: 14px; }
-    .admin-card { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: rgba(13,20,30,.86); box-shadow: var(--shadow); }
-    .admin-card-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-    .admin-card h3 { margin: 0; font-size: 16px; }
-    .admin-card-note { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
-    .admin-card .history-list { max-height: 420px; }
-    .admin-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
-    .admin-login { width: min(460px, 100%); margin: 14vh auto 0; }
-    .admin-login .admin-card-head { display: block; }
-    .admin-code-select { min-width: 110px; width: auto; }
     .watermark {
       position: fixed;
       right: 18px;
@@ -549,15 +523,6 @@
       .history-box > .license-body { padding: 12px 12px max(12px, env(safe-area-inset-bottom)); }
       .history-list { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
       .history-hit { text-align: left; }
-      .admin-layer { padding: 12px; }
-      .admin-shell { min-height: calc(100dvh - 24px); }
-      .admin-header, .admin-hero { align-items: flex-start; flex-direction: column; }
-      .admin-header { padding-top: max(4px, env(safe-area-inset-top)); }
-      .admin-header-actions, .admin-stats, .admin-workspace { width: 100%; }
-      .admin-stats { min-width: 0; }
-      .admin-workspace { grid-template-columns: 1fr; }
-      .admin-tools { grid-template-columns: 1fr; }
-      .admin-code-select { width: 100%; }
       .brand { align-items: flex-start; }
       .match-title { font-size: 28px; }
       .brand p { max-width: min(280px, calc(100vw - 96px)); line-height: 1.35; word-break: break-word; }
@@ -882,28 +847,6 @@
       </div>
     </section>
   </div>
-  <div class="license-layer admin-layer hidden" id="adminLayer">
-    <main class="admin-shell">
-      <header class="admin-header">
-        <div class="admin-brand"><div class="admin-brand-mark">AI</div><div><div class="admin-eyebrow">Operations / Control Room</div><h2>管理员后台</h2><p>账号授权、激活码和赛事数据的统一工作台</p></div></div>
-        <div class="admin-header-actions"><span class="badge"><span class="dot"></span>管理员权限</span><button class="btn" id="adminCloseBtn" type="button">返回首页</button></div>
-      </header>
-      <section class="admin-hero">
-        <div><div class="admin-eyebrow">Access overview</div><h1>今天，先把权限理顺。</h1><p>新用户默认获得 3 天使用权。激活码可授予一个月、半年、一年或永久权限，管理员也可以直接激活或停用账号。</p></div>
-        <div class="admin-stats"><div class="admin-stat"><span>用户总数</span><b id="adminUserCount">--</b></div><div class="admin-stat"><span>可用账号</span><b id="adminActiveCount">--</b></div><div class="admin-stat"><span>未使用激活码</span><b id="adminCodeCount">--</b></div></div>
-      </section>
-      <form class="admin-card admin-login hidden" id="adminLoginForm">
-        <div class="admin-card-head"><div><h3>管理员登录</h3><p class="admin-card-note">验证管理员账号后进入控制台。</p></div></div>
-        <div class="manual-form"><label>管理员邮箱<input class="input" id="adminEmailInput" type="email" autocomplete="email" required></label><label>管理员密码<input class="input" id="adminPasswordInput" type="password" autocomplete="current-password" minlength="8" required></label><button class="btn primary" type="submit">进入后台</button></div>
-      </form>
-      <div id="adminPanel" class="hidden">
-        <section class="admin-card" style="margin-bottom:14px"><div class="admin-card-head"><div><h3>快捷操作</h3><p class="admin-card-note">把常用的授权和数据任务放在一起。</p></div><div class="message" id="adminMessage"></div></div><div class="admin-tools"><button class="btn primary" id="updateDataBtn" type="button">更新赛事数据</button><select class="select admin-code-select" id="activationCodeDuration"><option value="month">一个月</option><option value="half_year">半年</option><option value="year">一年</option><option value="permanent">永久</option></select><button class="btn primary" id="generateCodeBtn" type="button">生成激活码</button></div></section>
-        <div class="admin-workspace"><section class="admin-card"><div class="admin-card-head"><div><h3>用户管理</h3><p class="admin-card-note">点击账号状态即可授予或收回永久使用权。</p></div></div><div class="history-list" id="adminUsersList"></div></section><section class="admin-card"><div class="admin-card-head"><div><h3>激活码记录</h3><p class="admin-card-note">激活码默认 72 小时内可兑换。</p></div></div><div class="history-list" id="adminCodesList"></div></section></div>
-        <section class="admin-card" style="margin-top:14px"><div class="admin-card-head"><div><h3>安全设置</h3><p class="admin-card-note">定期更新管理员密码，旧的后台会话会立即失效。</p></div></div><form class="manual-form" id="adminPasswordForm"><label>新管理员密码<input class="input" id="newAdminPassword" type="password" minlength="8" autocomplete="new-password" required></label><div class="manual-actions"><button class="btn" type="submit">重置管理员密码</button><button class="btn" id="adminLogoutBtn" type="button">退出后台</button></div></form></section>
-      </div>
-      <div class="message" id="adminLoginMessage"></div>
-    </main>
-  </div>
   <script>
     const PRODUCT_NAME = "AI足球赛事研判指挥舱本地版";
     const MANUAL_STORAGE_KEY = "football_ai_manual_matches_v1";
@@ -1001,13 +944,6 @@
       $("betPlayType").addEventListener("change", () => { syncBetPlayForm(); refreshLatestBetOdds(); });
       $("recordBetBtn").addEventListener("click", openBetRecorder);
       $("adminBtn").addEventListener("click", openAdminLayer);
-      $("adminCloseBtn").addEventListener("click", closeAdminLayer);
-      $("adminLoginForm").addEventListener("submit", loginAdmin);
-      $("adminPasswordForm").addEventListener("submit", resetAdminPassword);
-      $("updateDataBtn").addEventListener("click", updateDataFromAdmin);
-      $("generateCodeBtn").addEventListener("click", generateActivationCode);
-      $("adminLogoutBtn").addEventListener("click", logoutAdmin);
-      $("adminUsersList").addEventListener("click", updateAdminUser);
       $("historySearch").addEventListener("input", renderHistory);
       $("historyHitFilter").addEventListener("change", renderHistory);
       $("manualBtn").addEventListener("click", openManualLayer);
@@ -1026,20 +962,11 @@
       if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
       const response = await fetch(`/api${path}`, {...options, headers});
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.detail || "服务请求失败");
-      return payload;
-    }
-
-    async function adminRequest(path, options = {}) {
-      const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
-      if (csrfRequired(options)) headers["X-CSRF-Token"] = state.csrfToken;
-      const request = (token) => fetch(`/api${path}`, {...options, headers: {...headers, ...(token ? {Authorization: `Bearer ${token}`} : {})}});
-      let response = await request(state.adminToken || state.authToken);
-      if (!response.ok && state.adminToken && state.authToken && [401, 403].includes(response.status)) {
-        response = await request(state.authToken);
+      if (!response.ok) {
+        const error = new Error(payload.detail || "服务请求失败");
+        error.status = response.status;
+        throw error;
       }
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.detail || `管理员请求失败（HTTP ${response.status}）`);
       return payload;
     }
 
@@ -1055,17 +982,7 @@
     }
 
     function openAdminLayer() {
-      $("adminLayer").classList.remove("hidden");
-      updateAdminPanel();
-      if (state.adminToken || state.user?.is_admin) loadAdminData();
-    }
-
-    function closeAdminLayer() { $("adminLayer").classList.add("hidden"); }
-
-    function updateAdminPanel() {
-      const hasAdminAccess = Boolean(state.adminToken || state.user?.is_admin);
-      $("adminLoginForm").classList.toggle("hidden", hasAdminAccess);
-      $("adminPanel").classList.toggle("hidden", !hasAdminAccess);
+      location.href = "/admin.html";
     }
 
     function showAuthGate() {
@@ -1106,102 +1023,13 @@
       } catch (error) { $("gateMessage").textContent = error.message; }
     }
 
-    async function loginAdmin(event) {
-      event.preventDefault();
-      $("adminLoginMessage").textContent = "登录中...";
-      try {
-        const payload = await adminRequest("/admin/login", {method: "POST", body: JSON.stringify({email: $("adminEmailInput").value, password: $("adminPasswordInput").value})});
-        state.adminToken = payload.token;
-        localStorage.setItem("football_ai_admin_session", state.adminToken);
-        updateAdminPanel();
-        updateAdminVisibility();
-        await loadAdminData();
-        $("adminLoginMessage").textContent = "管理员登录成功。";
-      } catch (error) { $("adminLoginMessage").textContent = error.message; }
-    }
-
-    async function resetAdminPassword(event) {
-      event.preventDefault();
-      try {
-        const payload = await adminRequest("/admin/password", {method: "POST", body: JSON.stringify({new_password: $("newAdminPassword").value})});
-        $("adminMessage").textContent = payload.message;
-        logoutAdmin();
-      } catch (error) { $("adminMessage").textContent = error.message; }
-    }
-
-    async function updateDataFromAdmin() {
-      const button = $("updateDataBtn");
-      button.disabled = true;
-      $("adminMessage").textContent = "正在抓取胜平负、比分、进球数和半全场赔率，请稍候...";
-      try {
-        const payload = await adminRequest("/admin/update-data", {method: "POST", body: "{}"});
-        $("adminMessage").textContent = payload.message;
-        await loadData();
-        renderAll();
-        await loadAdminData();
-      } catch (error) {
-        $("adminMessage").textContent = error.message;
-      } finally {
-        button.disabled = false;
-      }
-    }
-
-    function logoutAdmin() {
-      state.adminToken = "";
-      localStorage.removeItem("football_ai_admin_session");
-      updateAdminPanel();
-      updateAdminVisibility();
-    }
-
-    async function loadAdminData() {
-      try {
-        const [users, codes] = await Promise.all([adminRequest("/admin/users"), adminRequest("/admin/activation-codes")]);
-        $("adminUsersList").innerHTML = users.items.length ? users.items.map(renderAdminUser).join("") : '<div class="panel-sub">暂无用户。</div>';
-        $("adminCodesList").innerHTML = codes.items.length ? codes.items.map(renderAdminCode).join("") : '<div class="panel-sub">暂无激活码。</div>';
-        $("adminUserCount").textContent = users.items.length;
-        $("adminActiveCount").textContent = users.items.filter(user => user.is_active).length;
-        $("adminCodeCount").textContent = codes.items.filter(code => !code.used_at && new Date(code.expires_at) >= new Date()).length;
-      } catch (error) {
-        $("adminMessage").textContent = error.message;
-        if (error.message.includes("会话")) logoutAdmin();
-      }
-    }
-
-    function renderAdminUser(user) {
-      const action = user.is_active ? "停用" : "激活";
-      return `<div class="history-row"><div><b>${escapeHtml(user.email)}</b><small>ID ${user.id} · 记录 ${user.bet_count} · ${formatDateTime(user.created_at)}</small></div><div class="history-hit"><span>${user.is_active ? "正常" : "未激活"}</span><br><button class="btn" type="button" data-admin-user="${user.id}" data-active="${!user.is_active}">${action}</button></div></div>`;
-    }
-
-    function renderAdminCode(code) {
-      const expired = new Date(code.expires_at) < new Date();
-      const stateText = code.used_at ? `已使用 · 用户 ${code.used_by}` : expired ? "已过期" : "未使用";
-      return `<div class="history-row"><div><b>${escapeHtml(code.code_hint)}</b><small>授权时长 ${escapeHtml(code.duration)} · 有效期至 ${formatDateTime(code.expires_at)}</small></div><div class="history-hit">${stateText}</div></div>`;
-    }
-
-    async function generateActivationCode() {
-      try {
-        const payload = await adminRequest("/admin/activation-codes", {method: "POST", body: JSON.stringify({expires_hours: 72, duration: $("activationCodeDuration").value})});
-        $("adminMessage").textContent = `新激活码：${payload.code}（仅此处显示，请复制保存）`;
-        await loadAdminData();
-      } catch (error) { $("adminMessage").textContent = error.message; }
-    }
-
-    async function updateAdminUser(event) {
-      const button = event.target.closest("[data-admin-user]");
-      if (!button) return;
-      try {
-        await adminRequest(`/admin/users/${button.dataset.adminUser}`, {method: "PATCH", body: JSON.stringify({is_active: button.dataset.active === "true"})});
-        await loadAdminData();
-      } catch (error) { $("adminMessage").textContent = error.message; }
-    }
-
     async function restoreAccount() {
       if (!state.authToken) return;
       try {
         state.user = await apiRequest("/auth/me");
         updateAccountBadge();
       } catch (error) {
-        logoutAccount();
+        if (error.status === 401 || error.status === 403) logoutAccount();
       }
     }
 

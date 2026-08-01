@@ -29,7 +29,7 @@ try:
 except ImportError:
     pass
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{ROOT / 'football_ai.db'}")
-SESSION_DAYS = int(os.getenv("SESSION_DAYS", "14"))
+SESSION_DAYS = int(os.getenv("SESSION_DAYS", "365"))
 
 engine_options = {"pool_pre_ping": True}
 if DATABASE_URL.startswith("sqlite"):
@@ -149,6 +149,8 @@ app = FastAPI(title="Football AI Command Center API", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
 CSRF_COOKIE = "football_ai_csrf"
 DATA_UPDATE_LOCK = threading.Lock()
+DATA_UPDATE_STATUS_LOCK = threading.Lock()
+DATA_UPDATE_STATUS = {"running": False, "message": "", "output": ""}
 
 
 class RegisterRequest(BaseModel):
@@ -473,8 +475,19 @@ def reset_admin_password(payload: AdminPasswordResetRequest, session: AdminSessi
 
 @app.post("/api/admin/update-data", dependencies=[Depends(csrf_protect)])
 def admin_update_data(_: AdminSession = Depends(current_admin)) -> dict:
+    with DATA_UPDATE_STATUS_LOCK:
+        if DATA_UPDATE_STATUS["running"]:
+            raise HTTPException(status_code=409, detail="赛事数据更新正在进行中，请稍后查看")
+        DATA_UPDATE_STATUS.update(running=True, message="赛事数据更新已在后台启动", output="")
+    threading.Thread(target=run_data_update, daemon=True).start()
+    return {"status": "started", "message": "赛事数据更新已在后台启动，请稍后查看结果"}
+
+
+def run_data_update() -> None:
     if not DATA_UPDATE_LOCK.acquire(blocking=False):
-        raise HTTPException(status_code=409, detail="数据更新正在进行中，请稍后查看")
+        with DATA_UPDATE_STATUS_LOCK:
+            DATA_UPDATE_STATUS.update(running=False, message="赛事数据更新正在进行中，请稍后查看", output="")
+        return
     try:
         result = subprocess.run(
             [sys.executable, str(ROOT / "tools" / "update_daily_data.py"), "--history-days", "10", "--history-retention", "400"],
@@ -482,17 +495,30 @@ def admin_update_data(_: AdminSession = Depends(current_admin)) -> dict:
             capture_output=True,
             text=True,
             encoding="utf-8",
-            timeout=900,
+            timeout=1800,
             check=False,
         )
         output = (result.stdout or result.stderr or "").strip()
-        if result.returncode != 0:
-            raise HTTPException(status_code=502, detail=f"数据更新失败：{output[-2000:]}")
-        return {"status": "success", "message": "赛事数据更新完成", "output": output[-4000:]}
-    except subprocess.TimeoutExpired as exc:
-        raise HTTPException(status_code=504, detail="数据更新超过 15 分钟，任务已终止") from exc
+        with DATA_UPDATE_STATUS_LOCK:
+            DATA_UPDATE_STATUS.update(
+                running=False,
+                message="赛事数据更新完成" if result.returncode == 0 else "赛事数据更新失败",
+                output=output[-4000:],
+            )
+    except subprocess.TimeoutExpired:
+        with DATA_UPDATE_STATUS_LOCK:
+            DATA_UPDATE_STATUS.update(running=False, message="赛事数据更新超过 30 分钟，任务已终止", output="")
+    except Exception as exc:
+        with DATA_UPDATE_STATUS_LOCK:
+            DATA_UPDATE_STATUS.update(running=False, message=f"赛事数据更新失败：{exc}", output="")
     finally:
         DATA_UPDATE_LOCK.release()
+
+
+@app.get("/api/admin/update-data/status")
+def admin_update_data_status(_: AdminSession = Depends(current_admin)) -> dict:
+    with DATA_UPDATE_STATUS_LOCK:
+        return dict(DATA_UPDATE_STATUS)
 
 
 @app.get("/api/admin/users")
