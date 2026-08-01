@@ -568,7 +568,7 @@
 <body>
   <section class="auth-gate" id="authGate">
     <div class="panel auth-gate-box">
-      <div class="panel-head"><div><h1>AI足球赛事研判指挥舱</h1><div class="panel-sub">登录后查看赛事研判与个人执行记录</div></div></div>
+      <div class="panel-head"><div><h1>AI足球赛事研判指挥舱</h1><div class="panel-sub">登录后查看赛事研判与个人下注记录</div></div></div>
       <div class="panel-body">
         <form class="manual-form" id="gateLoginForm">
           <label>邮箱<input class="input" id="gateEmail" type="email" autocomplete="email" required></label>
@@ -655,7 +655,7 @@
                 </div>
               </div>
               <p class="final-text" id="finalText">数据加载后自动生成。</p>
-              <button class="btn primary" id="recordBetBtn" type="button"><span class="icon">＋</span>记录本场执行</button>
+              <button class="btn primary" id="recordBetBtn" type="button"><span class="icon">＋</span>记录本场下注</button>
             </div>
           </article>
 
@@ -845,13 +845,13 @@
     <section class="license-box account-workbench">
       <header>
         <div>
-          <h2>账号与执行记录</h2>
+          <h2>账号与下注记录</h2>
           <p>记录赛前研究计划并自动统计已结算赛事的盈亏，不提供实际下注服务。</p>
         </div>
         <button class="icon-btn" id="accountCloseBtn" type="button" aria-label="关闭账号面板" title="关闭">×</button>
       </header>
       <div class="license-body account-layout">
-        <aside class="account-sidebar"><div class="account-nav-title">Account center</div><nav class="account-nav"><button class="account-nav-item active" data-account-tab="overview" type="button">◎ <span>账号概览</span></button><button class="account-nav-item" data-account-tab="records" type="button">▤ <span>执行记录</span></button><button class="account-nav-item" data-account-tab="create" type="button">＋ <span>新增记录</span></button></nav></aside>
+        <aside class="account-sidebar"><div class="account-nav-title">Account center</div><nav class="account-nav"><button class="account-nav-item active" data-account-tab="overview" type="button">◎ <span>账号概览</span></button><button class="account-nav-item" data-account-tab="records" type="button">▤ <span>下注记录</span></button><button class="account-nav-item" data-account-tab="create" type="button">＋ <span>新增下注</span></button></nav></aside>
         <div class="account-main">
         <div id="authGuest">
           <form class="manual-form" id="loginForm">
@@ -869,7 +869,7 @@
         </div>
         <div id="authMember" class="hidden">
           <div class="account-profile"><div class="account-identity"><div class="account-avatar">◎</div><div><div class="account-email" id="accountEmail">--</div><div class="account-plan" id="accountPlan">正在读取授权状态…</div></div></div><button class="btn danger" id="logoutBtn" type="button">退出登录</button></div>
-          <section class="account-section"><div class="account-section-head"><div><h3>执行概览</h3><p class="panel-sub">只记录你的赛前计划；赛果同步后会自动结算。</p></div></div><div class="summary-grid" id="betSummary"></div></section>
+          <section class="account-section"><div class="account-section-head"><div><h3>下注概览</h3><p class="panel-sub">记录你的赛前下注；赛果同步后会自动结算。</p></div></div><div class="summary-grid" id="betSummary"></div></section>
           <div class="account-grid"><section class="account-section account-records"><div class="account-section-head"><div><h3>我的执行记录</h3><p class="panel-sub">最近保存的计划与结算结果</p></div><button class="btn" id="refreshBetsBtn" type="button">刷新</button></div><div class="history-list" id="betList"></div></section><section class="account-section account-record-form"><div class="account-section-head"><div><h3>新增执行记录</h3><p class="panel-sub" id="recordMatchInfo">请先在赛事列表中选择一场比赛。</p></div></div><form class="manual-form" id="betForm"><label>足彩玩法<select class="select" id="betPlayType"><option value="spf">胜平负</option><option value="rqspf">让球胜平负</option><option value="bf">比分</option><option value="zjq">总进球</option><option value="bqc">半全场</option></select></label><label>投注选项<select class="select" id="betSelection"></select></label><label class="hidden" id="betHandicapWrap">让球数<input class="input" id="betHandicap" type="number" step="0.5" min="-10" max="10"></label><div class="control-row"><label>参考赔率<input class="input" id="betOdds" type="number" min="1.01" step="0.01" required></label><label>金额<input class="input" id="betStake" type="number" min="0.01" step="0.01" required></label></div><button class="btn primary" type="submit">保存这条记录</button></form><div class="panel-sub" id="betMessage" style="margin-top:10px"></div></section></div>
         </div>
         <div class="message" id="authMessage"></div>

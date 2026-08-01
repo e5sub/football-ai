@@ -678,6 +678,21 @@ def admin_update_user(user_id: int, payload: UserStatusRequest, _: AdminSession 
     return user_payload(user)
 
 
+@app.delete("/api/admin/users/{user_id}", dependencies=[Depends(csrf_protect)])
+def admin_delete_user(user_id: int, session: AdminSession | SessionToken = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if user.is_admin or user.id == session.user_id:
+        raise HTTPException(status_code=400, detail="不能删除管理员账号")
+    db.query(ActivationCode).filter(ActivationCode.used_by == user.id).update({ActivationCode.used_by: None})
+    db.query(SessionToken).filter(SessionToken.user_id == user.id).delete()
+    db.query(Bet).filter(Bet.user_id == user.id).delete()
+    db.delete(user)
+    db.commit()
+    return {"message": "用户已删除"}
+
+
 @app.post("/api/admin/activation-codes", dependencies=[Depends(csrf_protect)])
 def create_activation_code(payload: ActivationCodeRequest, _: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
     grant_days = {"month": 30, "half_year": 180, "year": 365, "permanent": None}[payload.duration]
@@ -698,6 +713,16 @@ def create_activation_code(payload: ActivationCodeRequest, _: AdminSession = Dep
 def list_activation_codes(_: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
     records = db.scalars(select(ActivationCode).order_by(ActivationCode.created_at.desc()).limit(100)).all()
     return {"items": [activation_code_payload(record) for record in records]}
+
+
+@app.delete("/api/admin/activation-codes/{code_id}", dependencies=[Depends(csrf_protect)])
+def delete_activation_code(code_id: int, _: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
+    record = db.get(ActivationCode, code_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="激活码不存在")
+    db.delete(record)
+    db.commit()
+    return {"message": "激活码已删除"}
 
 
 PLAY_SELECTIONS = {
