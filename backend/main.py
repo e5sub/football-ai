@@ -148,6 +148,8 @@ initialize_database()
 app = FastAPI(title="Football AI Command Center API", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
 CSRF_COOKIE = "football_ai_csrf"
+AUTH_COOKIE = "football_ai_auth"
+ADMIN_COOKIE = "football_ai_admin"
 DATA_UPDATE_LOCK = threading.Lock()
 DATA_UPDATE_STATUS_LOCK = threading.Lock()
 DATA_UPDATE_STATUS = {"running": False, "message": "", "output": ""}
@@ -240,10 +242,10 @@ def user_has_access(user: User) -> bool:
     return user.is_active and (user.is_admin or user.activation_expires_at is None or as_utc(user.activation_expires_at) > now())
 
 
-def current_user(authorization: Annotated[str | None, Header()] = None, db: Session = Depends(db_session)) -> User:
-    if not authorization or not authorization.lower().startswith("bearer "):
+def current_user(authorization: Annotated[str | None, Header()] = None, auth_cookie: Annotated[str | None, Cookie(alias=AUTH_COOKIE)] = None, db: Session = Depends(db_session)) -> User:
+    token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else auth_cookie
+    if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请先登录")
-    token = authorization.split(" ", 1)[1].strip()
     session_token = db.scalar(select(SessionToken).where(SessionToken.token_hash == digest(token)))
     if not session_token or as_utc(session_token.expires_at) < now():
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录已过期")
@@ -255,10 +257,10 @@ def current_user(authorization: Annotated[str | None, Header()] = None, db: Sess
     return user
 
 
-def current_admin(authorization: Annotated[str | None, Header()] = None, db: Session = Depends(db_session)) -> AdminSession | SessionToken:
-    if not authorization or not authorization.lower().startswith("bearer "):
+def current_admin(authorization: Annotated[str | None, Header()] = None, admin_cookie: Annotated[str | None, Cookie(alias=ADMIN_COOKIE)] = None, auth_cookie: Annotated[str | None, Cookie(alias=AUTH_COOKIE)] = None, db: Session = Depends(db_session)) -> AdminSession | SessionToken:
+    token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else admin_cookie or auth_cookie
+    if not token:
         raise HTTPException(status_code=401, detail="需要管理员登录")
-    token = authorization.split(" ", 1)[1].strip()
     session = db.scalar(select(AdminSession).where(AdminSession.token_hash == digest(token)))
     if session:
         if as_utc(session.expires_at) < now():
@@ -400,6 +402,13 @@ def csrf_token(response: Response) -> dict:
     return {"csrf_token": token}
 
 
+@app.post("/api/auth/logout", dependencies=[Depends(csrf_protect)])
+def logout(response: Response) -> dict:
+    response.delete_cookie(AUTH_COOKIE)
+    response.delete_cookie(ADMIN_COOKIE)
+    return {"message": "已退出登录"}
+
+
 @app.post("/api/auth/register", dependencies=[Depends(csrf_protect)])
 def register(payload: RegisterRequest, db: Session = Depends(db_session)) -> dict:
     email = str(payload.email).lower()
@@ -441,7 +450,7 @@ def activate() -> None:
 
 
 @app.post("/api/auth/login", dependencies=[Depends(csrf_protect)])
-def login(payload: LoginRequest, db: Session = Depends(db_session)) -> dict:
+def login(payload: LoginRequest, response: Response, db: Session = Depends(db_session)) -> dict:
     email = str(payload.email).lower()
     user = db.scalar(select(User).where(User.email == email))
     if not user or not check_password(payload.password, user.password_hash):
@@ -451,6 +460,7 @@ def login(payload: LoginRequest, db: Session = Depends(db_session)) -> dict:
     raw_token = secrets.token_urlsafe(32)
     db.add(SessionToken(user_id=user.id, token_hash=digest(raw_token), expires_at=now() + timedelta(days=SESSION_DAYS)))
     db.commit()
+    response.set_cookie(AUTH_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400)
     return {"token": raw_token, "user": user_payload(user)}
 
 
@@ -460,13 +470,14 @@ def me(user: User = Depends(current_user)) -> dict:
 
 
 @app.post("/api/admin/login", dependencies=[Depends(csrf_protect)])
-def admin_login(payload: AdminLoginRequest, db: Session = Depends(db_session)) -> dict:
+def admin_login(payload: AdminLoginRequest, response: Response, db: Session = Depends(db_session)) -> dict:
     user = db.scalar(select(User).where(User.email == str(payload.email).lower()))
     if not user or not user.is_admin or not user_has_access(user) or not check_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="管理员账号或密码错误")
     raw_token = secrets.token_urlsafe(32)
     db.add(AdminSession(user_id=user.id, token_hash=digest(raw_token), expires_at=now() + timedelta(days=SESSION_DAYS)))
     db.commit()
+    response.set_cookie(ADMIN_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400)
     return {"token": raw_token, "expires_in_days": SESSION_DAYS, "user": user_payload(user)}
 
 

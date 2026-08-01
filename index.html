@@ -1047,7 +1047,6 @@
     }
 
     async function restoreAccount() {
-      if (!state.authToken) return;
       try {
         state.user = await apiRequest("/auth/me");
         updateAccountBadge();
@@ -1101,6 +1100,7 @@
     }
 
     function logoutAccount() {
+      fetch("/api/auth/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": state.csrfToken}}).catch(() => {});
       state.authToken = "";
       state.user = null;
       localStorage.removeItem("football_ai_session");
