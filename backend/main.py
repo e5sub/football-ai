@@ -11,7 +11,7 @@ import sys
 import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,6 +48,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(256))
     is_active: Mapped[bool] = mapped_column(default=False)
+    activation_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     bets: Mapped[list["Bet"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -83,6 +84,7 @@ class ActivationCode(Base):
     code_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     code_hint: Mapped[str] = mapped_column(String(12))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    grant_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     used_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -121,6 +123,8 @@ def initialize_database() -> None:
         user_columns = {column["name"] for column in inspector.get_columns("users")}
         if "is_admin" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"))
+        if "activation_expires_at" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN activation_expires_at DATETIME NULL"))
         admin_columns = {column["name"] for column in inspector.get_columns("admin_sessions")}
         if "user_id" not in admin_columns:
             connection.execute(text("ALTER TABLE admin_sessions ADD COLUMN user_id INTEGER NULL"))
@@ -129,11 +133,15 @@ def initialize_database() -> None:
             first_user = connection.execute(text("SELECT MIN(id) FROM users")).scalar()
             if first_user is not None:
                 connection.execute(text("UPDATE users SET is_admin = 1 WHERE id = :user_id"), {"user_id": first_user})
+        connection.execute(text("UPDATE users SET is_active = 1, activation_expires_at = NULL WHERE is_admin = 1"))
         bet_columns = {column["name"] for column in inspector.get_columns("bets")}
         if "play_type" not in bet_columns:
             connection.execute(text("ALTER TABLE bets ADD COLUMN play_type VARCHAR(16) NOT NULL DEFAULT 'spf'"))
         if "handicap" not in bet_columns:
             connection.execute(text("ALTER TABLE bets ADD COLUMN handicap FLOAT NULL"))
+        activation_code_columns = {column["name"] for column in inspector.get_columns("activation_codes")}
+        if "grant_days" not in activation_code_columns:
+            connection.execute(text("ALTER TABLE activation_codes ADD COLUMN grant_days INTEGER NULL"))
 
 
 initialize_database()
@@ -177,6 +185,7 @@ class UserStatusRequest(BaseModel):
 
 class ActivationCodeRequest(BaseModel):
     expires_hours: int = Field(default=72, ge=1, le=8760)
+    duration: Literal["month", "half_year", "year", "permanent"] = "month"
 
 
 def now() -> datetime:
@@ -218,6 +227,10 @@ def csrf_protect(
         raise HTTPException(status_code=403, detail="CSRF token 无效或缺失")
 
 
+def user_has_access(user: User) -> bool:
+    return user.is_active and (user.is_admin or user.activation_expires_at is None or user.activation_expires_at > now())
+
+
 def current_user(authorization: Annotated[str | None, Header()] = None, db: Session = Depends(db_session)) -> User:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请先登录")
@@ -226,7 +239,7 @@ def current_user(authorization: Annotated[str | None, Header()] = None, db: Sess
     if not session_token or session_token.expires_at < now():
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录已过期")
     user = db.get(User, session_token.user_id)
-    if not user or not user.is_active:
+    if not user or not user_has_access(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="账号尚未激活")
     return user
 
@@ -239,13 +252,19 @@ def current_admin(authorization: Annotated[str | None, Header()] = None, db: Ses
     if not session or session.expires_at < now():
         raise HTTPException(status_code=401, detail="管理员会话已过期")
     user = db.get(User, session.user_id) if session.user_id else None
-    if not user or not user.is_admin or not user.is_active:
+    if not user or not user.is_admin or not user_has_access(user):
         raise HTTPException(status_code=403, detail="没有管理员权限")
     return session
 
 
 def user_payload(user: User) -> dict:
-    return {"id": user.id, "email": user.email, "is_active": user.is_active, "is_admin": user.is_admin}
+    return {
+        "id": user.id,
+        "email": user.email,
+        "is_active": user_has_access(user),
+        "activation_expires_at": user.activation_expires_at.isoformat() if user.activation_expires_at else None,
+        "is_admin": user.is_admin,
+    }
 
 
 def bet_payload(bet: Bet) -> dict:
@@ -266,9 +285,12 @@ def bet_payload(bet: Bet) -> dict:
 
 
 def activation_code_payload(record: ActivationCode) -> dict:
+    duration_labels = {30: "一个月", 180: "半年", 365: "一年", None: "永久"}
     return {
         "id": record.id,
         "code_hint": record.code_hint,
+        "duration": duration_labels.get(record.grant_days, f"{record.grant_days}天"),
+        "grant_days": record.grant_days,
         "expires_at": record.expires_at.isoformat(),
         "used_at": record.used_at.isoformat() if record.used_at else None,
         "used_by": record.used_by,
@@ -366,31 +388,33 @@ def register(payload: RegisterRequest, db: Session = Depends(db_session)) -> dic
         if not activation_record or activation_record.used_at or activation_record.expires_at < now():
             raise HTTPException(status_code=400, detail="激活码无效、已使用或已过期")
     first_user = db.scalar(select(User.id).limit(1)) is None
-    user = User(email=email, password_hash=hash_password(payload.password), is_active=bool(activation_record), is_admin=first_user)
+    user = User(
+        email=email,
+        password_hash=hash_password(payload.password),
+        is_active=True,
+        activation_expires_at=(
+            None
+            if first_user or (activation_record and activation_record.grant_days is None)
+            else now() + timedelta(days=activation_record.grant_days if activation_record else 3)
+        ),
+        is_admin=first_user,
+    )
     db.add(user)
     db.flush()
-    raw_token = None
     if activation_record:
         activation_record.used_at = now()
         activation_record.used_by = user.id
-    else:
-        raw_token = secrets.token_urlsafe(32)
-        db.add(ActivationToken(user_id=user.id, token_hash=digest(raw_token), expires_at=now() + timedelta(hours=24)))
     db.commit()
-    activation_url = f"/api/auth/activate?token={raw_token}" if raw_token else None
-    return {"message": "注册成功，账号已激活" if activation_record else "注册成功，请使用激活链接激活账号", "activation_url": activation_url, "is_active": user.is_active}
+    return {
+        "message": "注册成功，激活码已生效，请登录" if activation_record else ("注册成功，账号已激活，请登录" if first_user else "注册成功，已赠送 3 天使用权"),
+        "activation_url": None,
+        **user_payload(user),
+    }
 
 
 @app.get("/api/auth/activate")
-def activate(token: str, db: Session = Depends(db_session)):
-    record = db.scalar(select(ActivationToken).where(ActivationToken.token_hash == digest(token)))
-    if not record or record.expires_at < now():
-        raise HTTPException(status_code=400, detail="激活链接无效或已过期")
-    user = db.get(User, record.user_id)
-    user.is_active = True
-    db.delete(record)
-    db.commit()
-    return RedirectResponse(url="/", status_code=303)
+def activate() -> None:
+    raise HTTPException(status_code=403, detail="账号需由管理员激活")
 
 
 @app.post("/api/auth/login", dependencies=[Depends(csrf_protect)])
@@ -399,8 +423,8 @@ def login(payload: LoginRequest, db: Session = Depends(db_session)) -> dict:
     user = db.scalar(select(User).where(User.email == email))
     if not user or not check_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="邮箱或密码错误")
-    if not user.is_active:
-        raise HTTPException(status_code=403, detail="账号尚未激活，请先使用激活链接")
+    if not user_has_access(user):
+        raise HTTPException(status_code=403, detail="账号使用权已过期，请使用激活码或联系管理员")
     raw_token = secrets.token_urlsafe(32)
     db.add(SessionToken(user_id=user.id, token_hash=digest(raw_token), expires_at=now() + timedelta(days=SESSION_DAYS)))
     db.commit()
@@ -415,7 +439,7 @@ def me(user: User = Depends(current_user)) -> dict:
 @app.post("/api/admin/login", dependencies=[Depends(csrf_protect)])
 def admin_login(payload: AdminLoginRequest, db: Session = Depends(db_session)) -> dict:
     user = db.scalar(select(User).where(User.email == str(payload.email).lower()))
-    if not user or not user.is_admin or not user.is_active or not check_password(payload.password, user.password_hash):
+    if not user or not user.is_admin or not user_has_access(user) or not check_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="管理员账号或密码错误")
     raw_token = secrets.token_urlsafe(32)
     db.add(AdminSession(user_id=user.id, token_hash=digest(raw_token), expires_at=now() + timedelta(days=SESSION_DAYS)))
@@ -473,6 +497,7 @@ def admin_update_user(user_id: int, payload: UserStatusRequest, _: AdminSession 
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     user.is_active = payload.is_active
+    user.activation_expires_at = None
     if not payload.is_active:
         db.query(SessionToken).filter(SessionToken.user_id == user.id).delete()
     db.commit()
@@ -481,11 +506,13 @@ def admin_update_user(user_id: int, payload: UserStatusRequest, _: AdminSession 
 
 @app.post("/api/admin/activation-codes", dependencies=[Depends(csrf_protect)])
 def create_activation_code(payload: ActivationCodeRequest, _: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
+    grant_days = {"month": 30, "half_year": 180, "year": 365, "permanent": None}[payload.duration]
     raw_code = f"FC-{secrets.token_hex(6).upper()}"
     record = ActivationCode(
         code_hash=digest(raw_code),
         code_hint=f"...{raw_code[-4:]}",
         expires_at=now() + timedelta(hours=payload.expires_hours),
+        grant_days=grant_days,
     )
     db.add(record)
     db.commit()

@@ -544,7 +544,8 @@
         <form class="manual-form hidden" id="gateRegisterForm">
           <label>邮箱<input class="input" id="gateRegisterEmail" type="email" autocomplete="email" required></label>
           <label>密码<input class="input" id="gateRegisterPassword" type="password" autocomplete="new-password" minlength="8" required></label>
-          <label>激活码（可选）<input class="input" id="gateActivationCode" autocomplete="off"></label>
+          <label>激活码（可选）<input class="input" id="gateActivationCode" autocomplete="off" placeholder="管理员提供时填写"></label>
+          <div class="panel-sub">注册默认赠送 3 天使用权，也可填写管理员提供的激活码。</div>
           <div class="manual-actions"><button class="btn primary" type="submit">注册</button><button class="btn" id="gateShowLoginBtn" type="button">返回登录</button></div>
         </form>
         <div class="message" id="gateMessage"></div>
@@ -825,7 +826,8 @@
           <form class="manual-form hidden" id="registerForm">
             <label>邮箱<input class="input" id="registerEmail" type="email" autocomplete="email" required></label>
             <label>密码<input class="input" id="registerPassword" type="password" autocomplete="new-password" minlength="8" required></label>
-            <label>激活码（可选）<input class="input" id="registerActivationCode" autocomplete="off" placeholder="例如 FC-ABC123456789"></label>
+            <label>激活码（可选）<input class="input" id="registerActivationCode" autocomplete="off" placeholder="管理员提供时填写"></label>
+            <div class="panel-sub">注册默认赠送 3 天使用权，也可填写管理员提供的激活码。</div>
             <div class="manual-actions"><button class="btn primary" type="submit">注册</button><button class="btn" id="showLoginBtn" type="button">返回登录</button></div>
           </form>
         </div>
@@ -848,7 +850,7 @@
   <div class="license-layer hidden" id="adminLayer">
     <section class="license-box history-box">
       <header>
-        <div><h2>管理员后台</h2><p>管理账号状态与一次性激活码。管理员密钥只用于换取短期后台会话。</p></div>
+        <div><h2>管理员后台</h2><p>管理员可手动激活或停用账号。管理员密钥只用于换取短期后台会话。</p></div>
         <button class="icon-btn" id="adminCloseBtn" type="button" aria-label="关闭管理后台" title="关闭">×</button>
       </header>
       <div class="license-body">
@@ -858,7 +860,7 @@
           <div class="manual-actions"><button class="btn primary" type="submit">进入后台</button></div>
         </form>
         <div id="adminPanel" class="hidden">
-          <div class="manual-actions"><button class="btn primary" id="updateDataBtn" type="button">更新赛事数据</button><button class="btn primary" id="generateCodeBtn" type="button">生成激活码</button><button class="btn" id="adminLogoutBtn" type="button">退出后台</button></div>
+          <div class="manual-actions"><button class="btn primary" id="updateDataBtn" type="button">更新赛事数据</button><select class="select" id="activationCodeDuration" style="width:auto"><option value="month">一个月</option><option value="half_year">半年</option><option value="year">一年</option><option value="permanent">永久</option></select><button class="btn primary" id="generateCodeBtn" type="button">生成激活码</button><button class="btn" id="adminLogoutBtn" type="button">退出后台</button></div>
           <div class="message" id="adminMessage"></div>
           <form class="manual-form" id="adminPasswordForm" style="margin-top:12px">
             <label>新管理员密码<input class="input" id="newAdminPassword" type="password" minlength="8" autocomplete="new-password" required></label>
@@ -1064,7 +1066,7 @@
       try {
         const activationCode = $("gateActivationCode").value.trim();
         const payload = await apiRequest("/auth/register", {method: "POST", body: JSON.stringify({email: $("gateRegisterEmail").value, password: $("gateRegisterPassword").value, activation_code: activationCode || null})});
-        $("gateMessage").textContent = payload.activation_url ? `注册成功，请激活后登录：${payload.activation_url}` : "注册成功，账号已激活，请登录。";
+        $("gateMessage").textContent = payload.message;
         $("gateRegisterForm").classList.add("hidden");
         $("gateLoginForm").classList.remove("hidden");
         $("gateEmail").value = $("gateRegisterEmail").value;
@@ -1137,12 +1139,12 @@
     function renderAdminCode(code) {
       const expired = new Date(code.expires_at) < new Date();
       const stateText = code.used_at ? `已使用 · 用户 ${code.used_by}` : expired ? "已过期" : "未使用";
-      return `<div class="history-row"><div><b>${escapeHtml(code.code_hint)}</b><small>有效期至 ${formatDateTime(code.expires_at)}</small></div><div class="history-hit">${stateText}</div></div>`;
+      return `<div class="history-row"><div><b>${escapeHtml(code.code_hint)}</b><small>授权时长 ${escapeHtml(code.duration)} · 有效期至 ${formatDateTime(code.expires_at)}</small></div><div class="history-hit">${stateText}</div></div>`;
     }
 
     async function generateActivationCode() {
       try {
-        const payload = await adminRequest("/admin/activation-codes", {method: "POST", body: JSON.stringify({expires_hours: 72})});
+        const payload = await adminRequest("/admin/activation-codes", {method: "POST", body: JSON.stringify({expires_hours: 72, duration: $("activationCodeDuration").value})});
         $("adminMessage").textContent = `新激活码：${payload.code}（仅此处显示，请复制保存）`;
         await loadAdminData();
       } catch (error) { $("adminMessage").textContent = error.message; }
@@ -1207,7 +1209,7 @@
       try {
         const activationCode = $("registerActivationCode").value.trim();
         const payload = await apiRequest("/auth/register", {method: "POST", body: JSON.stringify({email: $("registerEmail").value, password: $("registerPassword").value, activation_code: activationCode || null})});
-        setAuthMessage(payload.activation_url ? `注册成功，请打开激活链接：${payload.activation_url}` : "注册成功，账号已激活，可以直接登录。");
+        setAuthMessage(payload.message);
       } catch (error) { setAuthMessage(error.message); }
     }
 
