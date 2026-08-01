@@ -952,6 +952,7 @@
       await loadData();
       updateAdminVisibility();
       renderAll();
+      if (state.user?.is_admin) openAdminLayer();
     }
 
     function bindEvents() {
@@ -1004,10 +1005,13 @@
     async function adminRequest(path, options = {}) {
       const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
       if (csrfRequired(options)) headers["X-CSRF-Token"] = state.csrfToken;
-      if (state.adminToken) headers.Authorization = `Bearer ${state.adminToken}`;
-      const response = await fetch(`/api${path}`, {...options, headers});
+      const request = (token) => fetch(`/api${path}`, {...options, headers: {...headers, ...(token ? {Authorization: `Bearer ${token}`} : {})}});
+      let response = await request(state.adminToken || state.authToken);
+      if (!response.ok && state.adminToken && state.authToken && [401, 403].includes(response.status)) {
+        response = await request(state.authToken);
+      }
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.detail || "管理员请求失败");
+      if (!response.ok) throw new Error(payload.detail || `管理员请求失败（HTTP ${response.status}）`);
       return payload;
     }
 
@@ -1025,14 +1029,15 @@
     function openAdminLayer() {
       $("adminLayer").classList.remove("hidden");
       updateAdminPanel();
-      if (state.adminToken) loadAdminData();
+      if (state.adminToken || state.user?.is_admin) loadAdminData();
     }
 
     function closeAdminLayer() { $("adminLayer").classList.add("hidden"); }
 
     function updateAdminPanel() {
-      $("adminLoginForm").classList.toggle("hidden", Boolean(state.adminToken));
-      $("adminPanel").classList.toggle("hidden", !state.adminToken);
+      const hasAdminAccess = Boolean(state.adminToken || state.user?.is_admin);
+      $("adminLoginForm").classList.toggle("hidden", hasAdminAccess);
+      $("adminPanel").classList.toggle("hidden", !hasAdminAccess);
     }
 
     function showAuthGate() {
@@ -1045,6 +1050,7 @@
       await loadData();
       updateAdminVisibility();
       renderAll();
+      if (state.user?.is_admin) openAdminLayer();
     }
 
     async function loginGate(event) {
@@ -1186,7 +1192,7 @@
     function updateAdminVisibility() {
       const canSeeAdminEntry = Boolean(state.user?.is_admin) && (Boolean(state.adminToken) || Boolean(state.user));
       $("adminBtn").classList.toggle("hidden", !canSeeAdminEntry);
-      $("adminBtnText").textContent = state.adminToken ? "管理后台" : "管理员登录";
+      $("adminBtnText").textContent = state.adminToken || state.user?.is_admin ? "管理后台" : "管理员登录";
     }
 
     async function loginAccount(event) {

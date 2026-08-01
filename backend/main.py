@@ -192,6 +192,13 @@ def now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def as_utc(value: datetime) -> datetime:
+    """Treat timezone-less database datetimes as UTC before comparing them."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def digest(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
@@ -228,7 +235,7 @@ def csrf_protect(
 
 
 def user_has_access(user: User) -> bool:
-    return user.is_active and (user.is_admin or user.activation_expires_at is None or user.activation_expires_at > now())
+    return user.is_active and (user.is_admin or user.activation_expires_at is None or as_utc(user.activation_expires_at) > now())
 
 
 def current_user(authorization: Annotated[str | None, Header()] = None, db: Session = Depends(db_session)) -> User:
@@ -236,7 +243,7 @@ def current_user(authorization: Annotated[str | None, Header()] = None, db: Sess
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请先登录")
     token = authorization.split(" ", 1)[1].strip()
     session_token = db.scalar(select(SessionToken).where(SessionToken.token_hash == digest(token)))
-    if not session_token or session_token.expires_at < now():
+    if not session_token or as_utc(session_token.expires_at) < now():
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录已过期")
     user = db.get(User, session_token.user_id)
     if not user or not user_has_access(user):
@@ -244,17 +251,25 @@ def current_user(authorization: Annotated[str | None, Header()] = None, db: Sess
     return user
 
 
-def current_admin(authorization: Annotated[str | None, Header()] = None, db: Session = Depends(db_session)) -> AdminSession:
+def current_admin(authorization: Annotated[str | None, Header()] = None, db: Session = Depends(db_session)) -> AdminSession | SessionToken:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="需要管理员登录")
     token = authorization.split(" ", 1)[1].strip()
     session = db.scalar(select(AdminSession).where(AdminSession.token_hash == digest(token)))
-    if not session or session.expires_at < now():
-        raise HTTPException(status_code=401, detail="管理员会话已过期")
-    user = db.get(User, session.user_id) if session.user_id else None
+    if session:
+        if as_utc(session.expires_at) < now():
+            raise HTTPException(status_code=401, detail="管理员会话已过期")
+        user = db.get(User, session.user_id) if session.user_id else None
+        admin_session = session
+    else:
+        user_session = db.scalar(select(SessionToken).where(SessionToken.token_hash == digest(token)))
+        if not user_session or as_utc(user_session.expires_at) < now():
+            raise HTTPException(status_code=401, detail="管理员会话已过期")
+        user = db.get(User, user_session.user_id)
+        admin_session = user_session
     if not user or not user.is_admin or not user_has_access(user):
         raise HTTPException(status_code=403, detail="没有管理员权限")
-    return session
+    return admin_session
 
 
 def user_payload(user: User) -> dict:
@@ -385,7 +400,7 @@ def register(payload: RegisterRequest, db: Session = Depends(db_session)) -> dic
     activation_record = None
     if payload.activation_code:
         activation_record = db.scalar(select(ActivationCode).where(ActivationCode.code_hash == digest(payload.activation_code.strip().upper())))
-        if not activation_record or activation_record.used_at or activation_record.expires_at < now():
+        if not activation_record or activation_record.used_at or as_utc(activation_record.expires_at) < now():
             raise HTTPException(status_code=400, detail="激活码无效、已使用或已过期")
     first_user = db.scalar(select(User.id).limit(1)) is None
     user = User(
