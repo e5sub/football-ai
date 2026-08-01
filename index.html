@@ -599,7 +599,6 @@
         <button class="badge badge-button" id="historyBtn" type="button"><span class="icon">↺</span>历史回看</button>
         <button class="badge badge-button" id="accountBtn" type="button"><span class="icon">◎</span><span id="accountText">登录 / 注册</span></button>
         <button class="badge badge-button" id="adminBtn" type="button"><span class="icon">⚙</span><span id="adminBtnText">管理员登录</span></button>
-        <span class="badge"><span class="dot"></span><span>本地版</span></span>
         <span class="badge"><span class="dot" id="updateDot"></span><span id="updateText">500数据检查中</span></span>
         <span class="badge">历史样本 <b class="mono" id="historySample">--</b></span>
         <span class="badge">赛事 <b class="mono" id="matchCount">--</b></span>
@@ -655,7 +654,6 @@
                 </div>
               </div>
               <p class="final-text" id="finalText">数据加载后自动生成。</p>
-              <button class="btn primary" id="recordBetBtn" type="button"><span class="icon">＋</span>记录本场下注</button>
             </div>
           </article>
 
@@ -978,7 +976,6 @@
       // Odds are selection-specific.  Refresh them whenever the user changes
       // a result/score/goal option, not only when changing the play type.
       $("betSelection").addEventListener("change", refreshLatestBetOdds);
-      $("recordBetBtn").addEventListener("click", openBetRecorder);
       $("adminBtn").addEventListener("click", openAdminLayer);
       $("historySearch").addEventListener("input", renderHistory);
       $("historyHitFilter").addEventListener("change", renderHistory);
@@ -1095,7 +1092,11 @@
         state.user = await apiRequest("/auth/me");
         updateAccountBadge();
       } catch (error) {
-        if (error.status === 401 || error.status === 403) logoutAccount();
+        // Do not call the remote logout endpoint while restoring a session.
+        // A temporary failed request must not delete an otherwise valid
+        // HttpOnly cookie, which would force the user to sign in again after
+        // refreshing the page.
+        if (error.status === 401 || error.status === 403) logoutAccount({remote: false});
       }
     }
 
@@ -1156,8 +1157,8 @@
       } catch (error) { setAuthMessage(error.message); }
     }
 
-    function logoutAccount() {
-      fetch("/api/auth/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": state.csrfToken}}).catch(() => {});
+    function logoutAccount({remote = true} = {}) {
+      if (remote) fetch("/api/auth/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": state.csrfToken}}).catch(() => {});
       state.authToken = "";
       state.user = null;
       localStorage.removeItem("football_ai_session");

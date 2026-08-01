@@ -491,8 +491,8 @@ def csrf_token(response: Response) -> dict:
 
 @app.post("/api/auth/logout", dependencies=[Depends(csrf_protect)])
 def logout(response: Response) -> dict:
-    response.delete_cookie(AUTH_COOKIE)
-    response.delete_cookie(ADMIN_COOKIE)
+    response.delete_cookie(AUTH_COOKIE, path="/")
+    response.delete_cookie(ADMIN_COOKIE, path="/")
     return {"message": "已退出登录"}
 
 
@@ -547,7 +547,8 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(db_se
     raw_token = secrets.token_urlsafe(32)
     db.add(SessionToken(user_id=user.id, token_hash=digest(raw_token), expires_at=now() + timedelta(days=SESSION_DAYS)))
     db.commit()
-    response.set_cookie(AUTH_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.set_cookie(AUTH_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     return {"token": raw_token, "user": user_payload(user)}
 
 
@@ -568,8 +569,9 @@ def admin_login(payload: AdminLoginRequest, response: Response, db: Session = De
     db.add(AdminSession(user_id=user.id, token_hash=digest(raw_token), expires_at=expires_at))
     db.add(SessionToken(user_id=user.id, token_hash=digest(user_token), expires_at=expires_at))
     db.commit()
-    response.set_cookie(ADMIN_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400)
-    response.set_cookie(AUTH_COOKIE, user_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.set_cookie(ADMIN_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
+    response.set_cookie(AUTH_COOKIE, user_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     return {"token": raw_token, "user_token": user_token, "expires_in_days": SESSION_DAYS, "user": user_payload(user)}
 
 
