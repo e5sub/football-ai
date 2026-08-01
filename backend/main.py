@@ -379,6 +379,20 @@ def data_matches(response: Response, db: Session = Depends(db_session)) -> dict:
         return {"matches": []}
 
 
+@app.get("/api/data/analysis-archive")
+def data_analysis_archive(response: Response, db: Session = Depends(db_session)) -> dict:
+    """Return the same database snapshot written by the data-update task."""
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    snapshot = db.get(DataSnapshot, "analysis_archive")
+    if snapshot:
+        return snapshot.payload
+    try:
+        return json.loads((ROOT / "data" / "analysis_archive.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"matches": []}
+
+
 @app.get("/api/data/matches/{match_id}/plays")
 def match_plays(match_id: str, db: Session = Depends(db_session)) -> dict:
     match = next((item for item in load_matches(db) if str(item.get("id")) == match_id), None)
@@ -410,7 +424,11 @@ def latest_play_odds(match: dict, play_type: str) -> dict | None:
     ]
     for candidate in candidates:
         if isinstance(candidate, dict) and candidate:
-            return candidate.get("current", candidate)
+            prices = candidate.get("current", candidate)
+            if play_type == "bqc" and isinstance(prices, dict):
+                # Read snapshots created before the bqc normalization as well.
+                return {BQC_SOURCE_SELECTIONS.get(str(key), str(key)): value for key, value in prices.items()}
+            return prices
     if play_type == "spf" and isinstance(odds.get("current"), dict):
         return odds["current"]
     return None
@@ -436,6 +454,7 @@ def match_latest_odds(match_id: str, play_type: str = "spf", db: Session = Depen
 @app.get("/api/auth/csrf")
 def csrf_token(response: Response) -> dict:
     token = secrets.token_urlsafe(32)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.set_cookie(CSRF_COOKIE, token, httponly=False, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="strict", max_age=86400)
     return {"csrf_token": token}
 
@@ -503,7 +522,8 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(db_se
 
 
 @app.get("/api/auth/me")
-def me(user: User = Depends(current_user)) -> dict:
+def me(response: Response, user: User = Depends(current_user)) -> dict:
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     return user_payload(user)
 
 
@@ -513,10 +533,14 @@ def admin_login(payload: AdminLoginRequest, response: Response, db: Session = De
     if not user or not user.is_admin or not user_has_access(user) or not check_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="管理员账号或密码错误")
     raw_token = secrets.token_urlsafe(32)
-    db.add(AdminSession(user_id=user.id, token_hash=digest(raw_token), expires_at=now() + timedelta(days=SESSION_DAYS)))
+    user_token = secrets.token_urlsafe(32)
+    expires_at = now() + timedelta(days=SESSION_DAYS)
+    db.add(AdminSession(user_id=user.id, token_hash=digest(raw_token), expires_at=expires_at))
+    db.add(SessionToken(user_id=user.id, token_hash=digest(user_token), expires_at=expires_at))
     db.commit()
     response.set_cookie(ADMIN_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400)
-    return {"token": raw_token, "expires_in_days": SESSION_DAYS, "user": user_payload(user)}
+    response.set_cookie(AUTH_COOKIE, user_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400)
+    return {"token": raw_token, "user_token": user_token, "expires_in_days": SESSION_DAYS, "user": user_payload(user)}
 
 
 @app.post("/api/admin/password", dependencies=[Depends(csrf_protect)])
@@ -524,6 +548,7 @@ def reset_admin_password(payload: AdminPasswordResetRequest, session: AdminSessi
     user = db.get(User, session.user_id)
     user.password_hash = hash_password(payload.new_password)
     db.query(AdminSession).filter(AdminSession.user_id == user.id).delete()
+    db.query(SessionToken).filter(SessionToken.user_id == user.id).delete()
     db.commit()
     return {"message": "管理员密码已重置，请使用新密码重新登录"}
 
@@ -643,6 +668,11 @@ PLAY_SELECTIONS = {
     "bf": set(),
     "zjq": {str(value) for value in range(0, 8)},
     "bqc": {"home/home", "home/draw", "home/away", "draw/home", "draw/draw", "draw/away", "away/home", "away/draw", "away/away"},
+}
+BQC_SOURCE_SELECTIONS = {
+    "3-3": "home/home", "3-1": "home/draw", "3-0": "home/away",
+    "1-3": "draw/home", "1-1": "draw/draw", "1-0": "draw/away",
+    "0-3": "away/home", "0-1": "away/draw", "0-0": "away/away",
 }
 VALID_SELECTIONS = PLAY_SELECTIONS["spf"]
 

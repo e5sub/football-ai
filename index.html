@@ -983,7 +983,7 @@
       // administrator login alive when navigating back from the control room.
       const sessionToken = state.authToken || state.adminToken;
       if (sessionToken) headers.Authorization = `Bearer ${sessionToken}`;
-      const response = await fetch(`/api${path}`, {...options, headers});
+      const response = await fetch(`/api${path}`, {...options, headers, credentials: "same-origin", cache: "no-store"});
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
         const error = new Error(payload.detail || "服务请求失败");
@@ -1163,8 +1163,9 @@
     function renderBetRecord(bet) {
       const labels = {home: "主胜", draw: "平局", away: "客胜"};
       const playLabels = {spf: "胜平负", rqspf: "让球胜平负", bf: "比分", zjq: "总进球", bqc: "半全场"};
+      const bqcLabels = {"home/home":"胜胜","home/draw":"胜平","home/away":"胜负","draw/home":"平胜","draw/draw":"平平","draw/away":"平负","away/home":"负胜","away/draw":"负平","away/away":"负负"};
       const status = {pending: "待结算", won: "已命中", lost: "未命中"};
-      const selection = bet.play_type === "spf" || bet.play_type === "rqspf" ? (labels[bet.selection] || bet.selection) : bet.selection;
+      const selection = bet.play_type === "spf" || bet.play_type === "rqspf" ? (labels[bet.selection] || bet.selection) : (bet.play_type === "bqc" ? (bqcLabels[bet.selection] || bet.selection) : bet.selection);
       const handicap = bet.handicap === null || bet.handicap === undefined ? "" : ` · 让${bet.handicap}`;
       return `<div class="history-row"><div><b>${escapeHtml(bet.match_id)}</b><small>${playLabels[bet.play_type] || bet.play_type} · ${selection}${handicap} · ${bet.odds} · ${bet.stake}</small></div><div class="history-hit">${status[bet.status] || bet.status}<br><small>${bet.profit === null ? "--" : Number(bet.profit).toFixed(2)}</small></div></div>`;
     }
@@ -1654,7 +1655,7 @@
       $("historyMeta").textContent = "历史记录载入中...";
       const cached = readCachedJson(ARCHIVE_CACHE_KEY);
       try {
-        const payload = await fetchJsonWithTimeout("./data/analysis_archive.json", 7000);
+        const payload = await fetchJsonWithTimeout("/api/data/analysis-archive", 7000);
         state.archive = Array.isArray(payload.matches) ? payload.matches : [];
         writeCachedJson(ARCHIVE_CACHE_KEY, payload);
       } catch (error) {
@@ -1709,7 +1710,7 @@
 
     function registerOfflineSupport() {
       if (!("serviceWorker" in navigator) || location.protocol !== "https:") return;
-      navigator.serviceWorker.register("./sw.js").catch(() => {});
+      navigator.serviceWorker.register("./sw.js").then(registration => registration.update()).catch(() => {});
       window.addEventListener("offline", () => {
         $("updateText").textContent = "网络已断开·继续使用本地数据";
         $("updateDot").classList.add("warn");

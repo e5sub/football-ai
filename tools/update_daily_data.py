@@ -35,6 +35,7 @@ CURRENT_URL = "https://trade.500.com/jczq/index.php"
 HISTORY_URL = "https://open.500.com/iframe/kaijiang/jczq.php"
 ALL_FIXTURES_URL = "https://odds.500.com/index_all_{day}.shtml"
 PLAY_ODDS_URLS = {
+    "rqspf": f"{CURRENT_URL}?playid=269&g=2",
     "zjq": f"{CURRENT_URL}?playid=270&g=2",
     "bf": f"{CURRENT_URL}?playid=271&g=2",
     "bqc": f"{CURRENT_URL}?playid=272&g=2",
@@ -148,10 +149,10 @@ def main() -> None:
     write_json(HISTORY_PATH, {"updatedAt": now_iso(), "matches": history})
     write_json(ARCHIVE_PATH, {"updatedAt": now_iso(), "matches": archive})
     write_json(FIXTURE_CATALOG_PATH, fixture_catalog)
-    database_status = "skipped"
+    database_status: str | dict[str, str] = "skipped"
     if os.getenv("DATABASE_URL"):
         try:
-            sync_database(
+            database_status = sync_database(
                 {
                     "matches": payload,
                     "history": {"updatedAt": now_iso(), "matches": history},
@@ -159,7 +160,9 @@ def main() -> None:
                     "fixture_catalog": fixture_catalog,
                 }
             )
-            database_status = "success"
+            failed_datasets = [key for key, value in database_status.items() if value != "success"]
+            if failed_datasets:
+                warnings.append(f"数据库部分同步失败：{', '.join(failed_datasets)}；赛事快照已单独提交")
         except Exception as exc:  # noqa: BLE001
             database_status = "failed"
             warnings.append(f"数据库同步失败，已保留 JSON 数据：{exc}")
@@ -179,30 +182,33 @@ def main() -> None:
     # The API serves database snapshots before the JSON files.  Treat a failed
     # snapshot write as a failed update, otherwise the admin UI reports success
     # while users continue receiving the previous database data.
-    if database_status == "failed":
+    if database_status == "failed" or (isinstance(database_status, dict) and database_status.get("matches") != "success"):
         raise SystemExit("数据库同步失败；详情见上方 warnings")
 
 
-def sync_database(datasets: dict[str, dict[str, Any]]) -> None:
-    """Store the latest JSON-compatible datasets in the configured MySQL database."""
+def sync_database(datasets: dict[str, dict[str, Any]]) -> dict[str, str]:
+    """Store each dataset independently so a large auxiliary snapshot cannot roll back matches."""
     from backend.main import DataSnapshot, SessionLocal
 
     db = SessionLocal()
+    results: dict[str, str] = {}
     try:
         for dataset_key, payload in datasets.items():
-            record = db.get(DataSnapshot, dataset_key)
-            if record is None:
-                record = DataSnapshot(dataset_key=dataset_key, payload=payload)
-                db.add(record)
-            else:
-                record.payload = payload
-                record.updated_at = datetime.now(timezone.utc)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
+            try:
+                record = db.get(DataSnapshot, dataset_key)
+                if record is None:
+                    db.add(DataSnapshot(dataset_key=dataset_key, payload=payload))
+                else:
+                    record.payload = payload
+                    record.updated_at = datetime.now(timezone.utc)
+                db.commit()
+                results[dataset_key] = "success"
+            except Exception as exc:  # noqa: BLE001
+                db.rollback()
+                results[dataset_key] = f"failed: {exc}"
     finally:
         db.close()
+    return results
 
 
 def history_refresh_dates(reference_date: date, history_days: int) -> list[str]:
@@ -406,7 +412,10 @@ def parse_market_odds(body: str, market_type: str) -> list[float]:
 
 def parse_play_odds(body: str) -> dict[str, dict[str, float]]:
     """Extract all supported 500 JC play odds from data attributes."""
-    aliases = {"nspf": "spf", "spf": "spf", "rqspf": "rqspf", "bf": "bf", "jqs": "zjq", "zjq": "zjq", "bqc": "bqc"}
+    # 500 uses `nspf` for regular win/draw/loss and `spf` for the
+    # handicap version. Treating both as spf silently overwrites the regular
+    # prices and leaves rqspf unavailable in the betting form.
+    aliases = {"nspf": "spf", "spf": "rqspf", "rqspf": "rqspf", "bf": "bf", "jqs": "zjq", "zjq": "zjq", "bqc": "bqc"}
     plays: dict[str, dict[str, float]] = {}
     for tag in re.findall(r"<[^>]+>", body or ""):
         attrs = parse_html_attributes(tag)
@@ -422,6 +431,15 @@ def parse_play_odds(body: str) -> dict[str, dict[str, float]]:
         if play_type in plays:
             mapped = {"home": plays[play_type].get("3"), "draw": plays[play_type].get("1"), "away": plays[play_type].get("0")}
             plays[play_type] = {key: value for key, value in mapped.items() if value is not None}
+    if "bqc" in plays:
+        # 500 encodes half/full outcomes as 3-3, 3-1, … rather than the
+        # scoreline. Store the same canonical values used by settlement logic.
+        outcome_map = {"3": "home", "1": "draw", "0": "away"}
+        plays["bqc"] = {
+            f"{outcome_map[parts[0]]}/{outcome_map[parts[1]]}": price
+            for value, price in plays["bqc"].items()
+            if len(parts := value.split("-", 1)) == 2 and parts[0] in outcome_map and parts[1] in outcome_map
+        }
     return {key: value for key, value in plays.items() if value}
 
 
