@@ -12,7 +12,7 @@
 <body>
   <section class="auth-gate" id="authGate">
     <div class="panel auth-gate-box">
-      <div class="panel-head"><div><h1>AI足球赛事研判指挥舱</h1><div class="panel-sub">登录后查看赛事研判与个人下注记录</div></div></div>
+      <div class="panel-head"><div><h1 id="gateTitle">AI足球赛事研判指挥舱</h1><div class="panel-sub" id="gateSubtitle">登录后查看赛事研判与个人下注记录</div></div></div>
       <div class="panel-body">
         <form class="manual-form" id="gateLoginForm">
           <label>邮箱<input class="input" id="gateEmail" type="email" autocomplete="email" required></label>
@@ -71,7 +71,10 @@
       event.preventDefault();
       $("gateMessage").textContent = "登录中...";
       try {
-        const payload = await apiRequest("/auth/login", {method: "POST", body: JSON.stringify({email: $("gateEmail").value, password: $("gatePassword").value})});
+        const isAdminLogin = new URLSearchParams(location.search).get("role") === "admin";
+        const path = isAdminLogin ? "/admin/login" : "/auth/login";
+        const payload = await apiRequest(path, {method: "POST", body: JSON.stringify({email: $("gateEmail").value, password: $("gatePassword").value})});
+        if (isAdminLogin) localStorage.setItem("football_ai_admin_session", payload.token);
         localStorage.setItem("football_ai_session", payload.token);
         location.href = "/";
       } catch (error) { $("gateMessage").textContent = error.message; }
@@ -93,6 +96,11 @@
     async function init() {
       await loadCsrfToken();
       bindEvents();
+      if (new URLSearchParams(location.search).get("role") === "admin") {
+        $("gateTitle").textContent = "管理员登录";
+        $("gateSubtitle").textContent = "使用管理员账号验证后进入后台。";
+        $("gateShowRegisterBtn").classList.add("hidden");
+      }
     }
 
     init();

@@ -1026,12 +1026,6 @@
 
     function openAccountLayer() {
       location.href = "/account.html";
-    async function openAccountLayer() {
-      if (!state.user) {
-        $("accountLayer").classList.remove("hidden");
-      } else {
-        location.href = "/account.html";
-      }
     }
 
     function closeAccountLayer() { $("accountLayer").classList.add("hidden"); }
