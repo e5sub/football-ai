@@ -1092,16 +1092,11 @@
         state.user = await apiRequest(`/auth/me?__session=${Date.now()}`);
         updateAccountBadge();
       } catch (error) {
-        // An edge cache can briefly replay an old 401/403 during deployment.
-        // Retry with a fresh URL and retain local credentials unless the user
-        // explicitly chooses to log out.
-        if (error.status !== 401 && error.status !== 403) return;
-        try {
-          await new Promise(resolve => setTimeout(resolve, 150));
-          state.user = await apiRequest(`/auth/me?__session=${Date.now()}-${Math.random().toString(36).slice(2)}`);
-          updateAccountBadge();
-        } catch (retryError) {
-          console.warn("会话恢复失败；已保留本地凭据以便下次刷新重试。", retryError);
+        if (error.status === 401 || error.status === 403) {
+          // If session is invalid, clear the token to prevent re-using it.
+          logoutAccount({ remote: false }); // Only clear local state
+        } else {
+          console.warn("会话恢复失败，可能是网络问题。", error);
         }
       }
     }
