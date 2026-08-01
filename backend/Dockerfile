@@ -10,6 +10,6 @@ COPY admin.html /app/admin.html
 COPY sw.js /app/sw.js
 COPY data /app/data
 
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 PYTHONPATH=/app
 EXPOSE 8000
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
