@@ -1,0 +1,12 @@
+services:
+  app:
+    image: ${IMAGE_NAME:-ghcr.io/your-org/football-ai-command-center:latest}
+    container_name: football-ai
+    environment:
+      TZ: Asia/Shanghai
+      DATABASE_URL: ${DATABASE_URL:?请在 .env 中配置外部 MySQL DATABASE_URL}
+      SESSION_DAYS: ${SESSION_DAYS:-14}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
