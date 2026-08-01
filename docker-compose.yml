@@ -1,7 +1,7 @@
 services:
   app:
     image: ${IMAGE_NAME:-ghcr.io/your-org/ai-football:latest}
-    container_name: ai-football
+    container_name: football-ai
     environment:
       TZ: Asia/Shanghai
       DATABASE_URL: ${DATABASE_URL:?请在 .env 中配置外部 MySQL DATABASE_URL}

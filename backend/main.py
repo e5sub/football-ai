@@ -66,6 +66,22 @@ class ActivationToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class SessionToken(Base):
+    __tablename__ = "session_tokens"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AdminSession(Base):
+    __tablename__ = "admin_sessions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class ActivationCode(Base):
     __tablename__ = "activation_codes"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -113,6 +129,9 @@ def initialize_database() -> None:
             connection.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"))
         if "activation_expires_at" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN activation_expires_at DATETIME NULL"))
+        admin_columns = {column["name"] for column in inspector.get_columns("admin_sessions")}
+        if "user_id" not in admin_columns:
+            connection.execute(text("ALTER TABLE admin_sessions ADD COLUMN user_id INTEGER NULL"))
         has_admin = connection.execute(text("SELECT 1 FROM users WHERE is_admin = 1 LIMIT 1")).first()
         if not has_admin:
             first_user = connection.execute(text("SELECT MIN(id) FROM users")).scalar()
@@ -143,9 +162,11 @@ async def prevent_cdn_caching_api(request: Request, call_next):
         response.headers["Pragma"] = "no-cache"
         response.headers["Surrogate-Control"] = "no-store"
         response.headers["CDN-Cache-Control"] = "no-store"
-        response.headers["Vary"] = "Cookie, Authorization"
+        response.headers["Vary"] = "Cookie, Authorization, X-CSRF-Token"
     return response
+CSRF_COOKIE = "football_ai_csrf"
 AUTH_COOKIE = "football_ai_auth"
+ADMIN_COOKIE = "football_ai_admin"
 REMEMBER_COOKIE = "football_ai_remember"
 
 
@@ -307,6 +328,25 @@ def db_session():
         db.close()
 
 
+def csrf_protect(
+    request: Request,
+    csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
+    csrf_cookie: Annotated[str | None, Cookie(alias=CSRF_COOKIE)] = None,
+) -> None:
+    if csrf_header and csrf_cookie and hmac.compare_digest(csrf_header, csrf_cookie):
+        return
+
+    # Some CDNs intentionally remove or do not forward Set-Cookie/Cookie on
+    # uncached API routes. For same-origin browser requests, Origin validation
+    # provides a safe fallback without weakening cross-site request protection.
+    origin = urlparse(request.headers.get("origin", ""))
+    configured_origin = urlparse(PUBLIC_BASE_URL)
+    allowed_hosts = {host for host in (request.headers.get("host", "").lower(), configured_origin.netloc.lower()) if host}
+    if origin.scheme in {"http", "https"} and origin.netloc.lower() in allowed_hosts:
+        return
+    raise HTTPException(status_code=403, detail="CSRF token 无效或缺失")
+
+
 def user_has_access(user: User) -> bool:
     return user.is_active and (user.is_admin or user.activation_expires_at is None or as_utc(user.activation_expires_at) > now())
 
@@ -314,21 +354,78 @@ def user_has_access(user: User) -> bool:
 def current_user(
     authorization: Annotated[str | None, Header()] = None,
     auth_cookie: Annotated[str | None, Cookie(alias=AUTH_COOKIE)] = None,
+    admin_cookie: Annotated[str | None, Cookie(alias=ADMIN_COOKIE)] = None,
     remember_cookie: Annotated[str | None, Cookie(alias=REMEMBER_COOKIE)] = None,
     db: Session = Depends(db_session),
 ) -> User:
     header_token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else None
-    token = header_token or auth_cookie or remember_cookie
-    user = remembered_user(token, db)
-    if not user:
+    tokens = [token for token in (header_token, auth_cookie, admin_cookie) if token]
+    # Primary path: a permanent signed browser session, equivalent to Flask's
+    # built-in session cookie. It survives an application restart because its
+    # signature key is persisted independently of the session-token table.
+    for token in tokens:
+        signed_user = remembered_user(token, db)
+        if signed_user:
+            return signed_user
+    if not tokens:
+        user = remembered_user(remember_cookie, db)
+        if user:
+            return user
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请先登录")
+    session_token = None
+    user = None
+    for token in tokens:
+        candidate = db.scalar(select(SessionToken).where(SessionToken.token_hash == digest(token)))
+        if candidate and as_utc(candidate.expires_at) >= now():
+            candidate_user = db.get(User, candidate.user_id)
+            if candidate_user and user_has_access(candidate_user):
+                session_token, user = candidate, candidate_user
+                break
+        # An administrator is also a valid signed-in user.  This lets a
+        # direct admin login return to the homepage without requiring a second
+        # login just to create a regular session token.
+        admin_session = db.scalar(select(AdminSession).where(AdminSession.token_hash == digest(token)))
+        if admin_session and as_utc(admin_session.expires_at) >= now():
+            candidate_user = db.get(User, admin_session.user_id) if admin_session.user_id else None
+            if candidate_user and candidate_user.is_admin and user_has_access(candidate_user):
+                session_token, user = admin_session, candidate_user
+                break
+    if not user:
+        user = remembered_user(remember_cookie, db)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录已过期")
+    # The browser token already has the same fixed lifetime.  Avoid writing on
+    # every authenticated GET: a transient database write failure here used to
+    # turn a page refresh into a failed login and also blocked admin actions
+    # before their handler ran.
     return user
 
 
-def current_admin(user: User = Depends(current_user)) -> User:
-    if not user.is_admin:
+def current_admin(authorization: Annotated[str | None, Header()] = None, admin_cookie: Annotated[str | None, Cookie(alias=ADMIN_COOKIE)] = None, auth_cookie: Annotated[str | None, Cookie(alias=AUTH_COOKIE)] = None, db: Session = Depends(db_session)) -> AdminSession | SessionToken:
+    header_token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else None
+    tokens = [token for token in (header_token, admin_cookie, auth_cookie) if token]
+    if not tokens:
+        raise HTTPException(status_code=401, detail="需要管理员登录")
+    admin_session = None
+    user = None
+    for token in tokens:
+        session = db.scalar(select(AdminSession).where(AdminSession.token_hash == digest(token)))
+        if session and as_utc(session.expires_at) >= now():
+            candidate_user = db.get(User, session.user_id) if session.user_id else None
+            if candidate_user and candidate_user.is_admin and user_has_access(candidate_user):
+                admin_session, user = session, candidate_user
+                break
+        user_session = db.scalar(select(SessionToken).where(SessionToken.token_hash == digest(token)))
+        if user_session and as_utc(user_session.expires_at) >= now():
+            candidate_user = db.get(User, user_session.user_id)
+            if candidate_user and candidate_user.is_admin and user_has_access(candidate_user):
+                admin_session, user = user_session, candidate_user
+                break
+    if not admin_session or not user:
         raise HTTPException(status_code=403, detail="没有管理员权限")
-    return user
+    # Keep authentication checks read-only; see current_user above.  Admin
+    # requests must not depend on a session-renewal write succeeding.
+    return admin_session
 
 
 def user_payload(user: User) -> dict:
@@ -464,14 +561,23 @@ def match_latest_odds(match_id: str, play_type: str = "spf", db: Session = Depen
     }
 
 
-@app.post("/api/auth/logout")
+@app.get("/api/auth/csrf")
+def csrf_token(response: Response) -> dict:
+    token = secrets.token_urlsafe(32)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.set_cookie(CSRF_COOKIE, token, httponly=False, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="strict", max_age=86400, path="/")
+    return {"csrf_token": token}
+
+
+@app.post("/api/auth/logout", dependencies=[Depends(csrf_protect)])
 def logout(response: Response) -> dict:
     response.delete_cookie(AUTH_COOKIE, path="/")
+    response.delete_cookie(ADMIN_COOKIE, path="/")
     response.delete_cookie(REMEMBER_COOKIE, path="/")
     return {"message": "已退出登录"}
 
 
-@app.post("/api/auth/register")
+@app.post("/api/auth/register", dependencies=[Depends(csrf_protect)])
 def register(payload: RegisterRequest, db: Session = Depends(db_session)) -> dict:
     email = str(payload.email).lower()
     if db.scalar(select(User).where(User.email == email)):
@@ -511,7 +617,7 @@ def activate() -> None:
     raise HTTPException(status_code=403, detail="账号需由管理员激活")
 
 
-@app.post("/api/auth/login")
+@app.post("/api/auth/login", dependencies=[Depends(csrf_protect)])
 def login(payload: LoginRequest, response: Response, db: Session = Depends(db_session)) -> dict:
     email = str(payload.email).lower()
     user = db.scalar(select(User).where(User.email == email))
@@ -539,28 +645,35 @@ def me(response: Response, user: User = Depends(current_user)) -> dict:
     return user_payload(user)
 
 
-@app.post("/api/admin/login")
+@app.post("/api/admin/login", dependencies=[Depends(csrf_protect)])
 def admin_login(payload: AdminLoginRequest, response: Response, db: Session = Depends(db_session)) -> dict:
     user = db.scalar(select(User).where(User.email == str(payload.email).lower()))
     if not user or not user.is_admin or not user_has_access(user) or not check_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="管理员账号或密码错误")
+    raw_token = secrets.token_urlsafe(32)
     expires_at = now() + timedelta(days=SESSION_DAYS)
     user_token = remember_token(user, expires_at)
+    db.add(AdminSession(user_id=user.id, token_hash=digest(raw_token), expires_at=expires_at))
+    db.commit()
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.set_cookie(ADMIN_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     response.set_cookie(AUTH_COOKIE, user_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     response.set_cookie(REMEMBER_COOKIE, remember_token(user, expires_at), httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
-    return {"token": user_token, "user": user_payload(user)}
+    return {"token": raw_token, "user_token": user_token, "expires_in_days": SESSION_DAYS, "user": user_payload(user)}
 
 
-@app.post("/api/admin/password")
-def reset_admin_password(payload: AdminPasswordResetRequest, user: User = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
+@app.post("/api/admin/password", dependencies=[Depends(csrf_protect)])
+def reset_admin_password(payload: AdminPasswordResetRequest, session: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
+    user = db.get(User, session.user_id)
     user.password_hash = hash_password(payload.new_password)
+    db.query(AdminSession).filter(AdminSession.user_id == user.id).delete()
+    db.query(SessionToken).filter(SessionToken.user_id == user.id).delete()
     db.commit()
     return {"message": "管理员密码已重置，请使用新密码重新登录"}
 
 
-@app.post("/api/admin/update-data")
-def admin_update_data(_: User = Depends(current_admin)) -> dict:
+@app.post("/api/admin/update-data", dependencies=[Depends(csrf_protect)])
+def admin_update_data(_: AdminSession = Depends(current_admin)) -> dict:
     with DATA_UPDATE_STATUS_LOCK:
         if DATA_UPDATE_STATUS["running"]:
             raise HTTPException(status_code=409, detail="赛事数据更新正在进行中，请稍后查看")
@@ -617,13 +730,13 @@ def run_data_update() -> None:
 
 
 @app.get("/api/admin/update-data/status")
-def admin_update_data_status(_: User = Depends(current_admin)) -> dict:
+def admin_update_data_status(_: AdminSession = Depends(current_admin)) -> dict:
     with DATA_UPDATE_STATUS_LOCK:
         return dict(DATA_UPDATE_STATUS)
 
 
-@app.post("/api/admin/import-data")
-def admin_import_data(_: User = Depends(current_admin)) -> dict:
+@app.post("/api/admin/import-data", dependencies=[Depends(csrf_protect)])
+def admin_import_data(_: AdminSession = Depends(current_admin)) -> dict:
     results = import_json_snapshots()
     if results.get("matches") != "success":
         raise HTTPException(status_code=500, detail=f"赛事 JSON 导入数据库失败：{results.get('matches', '未知错误')}")
@@ -631,7 +744,7 @@ def admin_import_data(_: User = Depends(current_admin)) -> dict:
 
 
 @app.get("/api/admin/users")
-def admin_users(_: User = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
+def admin_users(_: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
     users = db.scalars(select(User).order_by(User.created_at.desc())).all()
     return {
         "items": [
@@ -641,33 +754,36 @@ def admin_users(_: User = Depends(current_admin), db: Session = Depends(db_sessi
     }
 
 
-@app.patch("/api/admin/users/{user_id}")
-def admin_update_user(user_id: int, payload: UserStatusRequest, _: User = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
+@app.patch("/api/admin/users/{user_id}", dependencies=[Depends(csrf_protect)])
+def admin_update_user(user_id: int, payload: UserStatusRequest, _: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     user.is_active = payload.is_active
     user.activation_expires_at = None
+    if not payload.is_active:
+        db.query(SessionToken).filter(SessionToken.user_id == user.id).delete()
     db.commit()
     return user_payload(user)
 
 
-@app.delete("/api/admin/users/{user_id}")
-def admin_delete_user(user_id: int, admin_user: User = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
+@app.delete("/api/admin/users/{user_id}", dependencies=[Depends(csrf_protect)])
+def admin_delete_user(user_id: int, session: AdminSession | SessionToken = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    if user.is_admin or user.id == admin_user.id:
+    if user.is_admin or user.id == session.user_id:
         raise HTTPException(status_code=400, detail="不能删除管理员账号")
     db.query(ActivationCode).filter(ActivationCode.used_by == user.id).update({ActivationCode.used_by: None})
+    db.query(SessionToken).filter(SessionToken.user_id == user.id).delete()
     db.query(Bet).filter(Bet.user_id == user.id).delete()
     db.delete(user)
     db.commit()
     return {"message": "用户已删除"}
 
 
-@app.post("/api/admin/activation-codes")
-def create_activation_code(payload: ActivationCodeRequest, _: User = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
+@app.post("/api/admin/activation-codes", dependencies=[Depends(csrf_protect)])
+def create_activation_code(payload: ActivationCodeRequest, _: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
     grant_days = {"month": 30, "half_year": 180, "year": 365, "permanent": None}[payload.duration]
     raw_code = f"FC-{secrets.token_hex(6).upper()}"
     record = ActivationCode(
@@ -683,13 +799,13 @@ def create_activation_code(payload: ActivationCodeRequest, _: User = Depends(cur
 
 
 @app.get("/api/admin/activation-codes")
-def list_activation_codes(_: User = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
+def list_activation_codes(_: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
     records = db.scalars(select(ActivationCode).order_by(ActivationCode.created_at.desc()).limit(100)).all()
     return {"items": [activation_code_payload(record) for record in records]}
 
 
-@app.delete("/api/admin/activation-codes/{code_id}")
-def delete_activation_code(code_id: int, _: User = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
+@app.delete("/api/admin/activation-codes/{code_id}", dependencies=[Depends(csrf_protect)])
+def delete_activation_code(code_id: int, _: AdminSession = Depends(current_admin), db: Session = Depends(db_session)) -> dict:
     record = db.get(ActivationCode, code_id)
     if not record:
         raise HTTPException(status_code=404, detail="激活码不存在")
@@ -719,7 +835,7 @@ def selection_is_valid(play_type: str, selection: str) -> bool:
     return selection in PLAY_SELECTIONS.get(play_type, set())
 
 
-@app.post("/api/bets")
+@app.post("/api/bets", dependencies=[Depends(csrf_protect)])
 def create_bet(payload: BetRequest, user: User = Depends(current_user), db: Session = Depends(db_session)) -> dict:
     if not any(str(match.get("id")) == payload.match_id for match in load_matches(db)):
         raise HTTPException(status_code=404, detail="赛事不存在或尚未同步")
@@ -838,13 +954,15 @@ def settle_all(db: Session) -> int:
 
 
 @app.post("/api/admin/settle")
-def settle(db: Session = Depends(db_session), _: User = Depends(current_admin)) -> dict:
+def settle(x_admin_key: Annotated[str | None, Header()] = None, db: Session = Depends(db_session)) -> dict:
+    if not x_admin_key or not hmac.compare_digest(x_admin_key, ADMIN_KEY):
+        raise HTTPException(status_code=403, detail="管理员密钥错误")
     return {"settled": settle_all(db)}
 
 
 @app.get("/api/admin/settle")
-def settle_get(db: Session = Depends(db_session), _: User = Depends(current_admin)) -> dict:
-    return settle(db)
+def settle_get(x_admin_key: Annotated[str | None, Header()] = None, db: Session = Depends(db_session)) -> dict:
+    return settle(x_admin_key, db)
 
 
 @app.get("/", include_in_schema=False)
