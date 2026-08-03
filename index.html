@@ -458,32 +458,24 @@
     }
     .manual-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .account-box { width: min(900px, 100%); }
-    .account-workbench { width: min(1100px, 100%); max-height: calc(100dvh - 36px); display: flex; flex-direction: column; }
+    .account-workbench { width: min(980px, 100%); max-height: calc(100dvh - 36px); display: flex; flex-direction: column; }
     .account-workbench > .license-body { min-height: 0; overflow: auto; }
     .account-box > .license-body { padding: 0; gap: 0; }
     .account-box #authGuest { padding: 18px; }
     .account-box > .license-body > .message { margin: 0 18px 14px; }
-    .account-profile { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px 18px; border-bottom: 1px solid var(--line2); background: linear-gradient(105deg, rgba(50,213,255,.11), rgba(51,230,166,.05) 56%, transparent); }
-    .account-identity { display: flex; gap: 11px; align-items: center; min-width: 0; }
-    .account-avatar { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; border: 1px solid rgba(50,213,255,.42); border-radius: 50%; color: var(--cyan); font-weight: 900; background: rgba(50,213,255,.1); }
-    .account-email { font-size: 14px; font-weight: 800; overflow-wrap: anywhere; }
-    .account-plan { margin-top: 4px; color: var(--muted); font-size: 12px; }
     .account-section { padding: 16px 18px; border-bottom: 1px solid var(--line2); }
     .account-section:last-child { border-bottom: 0; }
     .account-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
     .account-section-head h3 { margin: 0; font-size: 14px; }
-    .account-grid { display: grid; grid-template-columns: minmax(0,.9fr) minmax(280px,1.1fr); gap: 0; }
+    .account-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(340px,1.08fr); gap: 0; }
     .account-records { min-height: 0; }
     .account-records .history-list { max-height: 315px; overflow: auto; }
     .account-record-form { border-left: 1px solid var(--line2); }
     .account-record-form .manual-form { max-width: 430px; }
-    .account-workbench > header { border-bottom: 1px solid var(--line2); }
-    .account-layout { display: grid; grid-template-columns: 190px minmax(0,1fr); min-height: 520px; }
-    .account-sidebar { padding: 16px 10px; border-right: 1px solid var(--line2); background: rgba(5,10,16,.42); }
-    .account-nav-title { padding: 4px 9px 12px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
-    .account-nav { display: grid; gap: 6px; }
-    .account-nav-item { display: flex; gap: 9px; align-items: center; width: 100%; padding: 11px 9px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); text-align: left; }
-    .account-nav-item:hover, .account-nav-item.active { border-color: rgba(50,213,255,.35); background: rgba(50,213,255,.08); color: var(--text); }
+    .account-workbench > header { position: relative; padding: 20px 72px 18px 24px; border-bottom: 1px solid var(--line2); }
+    .account-workbench > header h2 { font-size: 22px; }
+    .account-workbench #accountCloseBtn { position: absolute; top: 16px; right: 16px; }
+    .account-layout { min-height: 0; padding: 0; }
     .account-main { min-width: 0; }
     body.history-open { overflow: hidden; }
     .history-layer { overflow: hidden; overscroll-behavior: contain; }
@@ -552,14 +544,10 @@
       .match-title { padding-right: 124px; font-size: 28px; }
       .brand p { max-width: min(280px, calc(100vw - 96px)); line-height: 1.35; word-break: break-word; }
       .panel-head { flex-wrap: wrap; }
-      .account-profile,.account-section-head { align-items: flex-start; flex-direction: column; }
+      .account-section-head { align-items: flex-start; flex-direction: column; }
       .account-grid { grid-template-columns: 1fr; }
       .account-record-form { border-left: 0; border-top: 1px solid var(--line2); }
       .panel-sub, .final-text, .report-card p, .league-line, .match-meta { word-break: break-all; }
-      .account-layout { grid-template-columns: 1fr; }
-      .account-sidebar { border-right: 0; border-bottom: 1px solid var(--line2); padding: 10px; }
-      .account-nav { display: flex; overflow-x: auto; }
-      .account-nav-item { min-width: max-content; }
     }
   </style>
 </head>
@@ -822,34 +810,13 @@
     <section class="license-box account-workbench">
       <header>
         <div>
-          <h2>账号与下注记录</h2>
-          <p>记录赛前研究计划并自动统计已结算赛事的盈亏，不提供实际下注服务。</p>
+          <h2>下注记录</h2>
+          <p>保存赛前研究计划，赛果同步后自动结算。</p>
         </div>
-        <button class="icon-btn" id="accountCloseBtn" type="button" aria-label="关闭账号面板" title="关闭">×</button>
+        <button class="icon-btn" id="accountCloseBtn" type="button" aria-label="关闭下注记录" title="关闭">×</button>
       </header>
       <div class="license-body account-layout">
-        <aside class="account-sidebar"><div class="account-nav-title">Account center</div><nav class="account-nav"><button class="account-nav-item active" data-account-tab="overview" type="button">◎ <span>账号概览</span></button><button class="account-nav-item" data-account-tab="records" type="button">▤ <span>下注记录</span></button><button class="account-nav-item" data-account-tab="create" type="button">＋ <span>新增下注</span></button></nav></aside>
-        <div class="account-main">
-        <div id="authGuest">
-          <form class="manual-form" id="loginForm">
-            <label>邮箱<input class="input" id="authEmail" type="email" autocomplete="email" required></label>
-            <label>密码<input class="input" id="authPassword" type="password" autocomplete="current-password" minlength="8" required></label>
-            <div class="manual-actions"><button class="btn primary" type="submit">登录</button><button class="btn" id="showRegisterBtn" type="button">注册新账号</button></div>
-          </form>
-          <form class="manual-form hidden" id="registerForm">
-            <label>邮箱<input class="input" id="registerEmail" type="email" autocomplete="email" required></label>
-            <label>密码<input class="input" id="registerPassword" type="password" autocomplete="new-password" minlength="8" required></label>
-            <label>激活码（可选）<input class="input" id="registerActivationCode" autocomplete="off" placeholder="管理员提供时填写"></label>
-            <div class="panel-sub">注册默认赠送 3 天使用权，也可填写管理员提供的激活码。</div>
-            <div class="manual-actions"><button class="btn primary" type="submit">注册</button><button class="btn" id="showLoginBtn" type="button">返回登录</button></div>
-          </form>
-        </div>
-        <div id="authMember" class="hidden">
-          <div class="account-profile"><div class="account-identity"><div class="account-avatar">◎</div><div><div class="account-email" id="accountEmail">--</div><div class="account-plan" id="accountPlan">正在读取授权状态…</div></div></div><button class="btn danger" id="logoutBtn" type="button">退出登录</button></div>
-          <section class="account-section"><div class="account-section-head"><div><h3>下注概览</h3><p class="panel-sub">记录你的赛前下注；赛果同步后会自动结算。</p></div></div><div class="summary-grid" id="betSummary"></div></section>
-          <div class="account-grid"><section class="account-section account-records"><div class="account-section-head"><div><h3>我的下注记录</h3><p class="panel-sub">最近保存的计划与结算结果</p></div><button class="btn" id="refreshBetsBtn" type="button">刷新</button></div><div class="history-list" id="betList"></div></section><section class="account-section account-record-form"><div class="account-section-head"><div><h3>新增下注记录</h3><p class="panel-sub" id="recordMatchInfo">请先在赛事列表中选择一场比赛。</p></div></div><form class="manual-form" id="betForm"><label>足彩玩法<select class="select" id="betPlayType"><option value="spf">胜平负</option><option value="rqspf">让球胜平负</option><option value="bf">比分</option><option value="zjq">总进球</option><option value="bqc">半全场</option></select></label><label>投注选项<select class="select" id="betSelection"></select></label><label class="hidden" id="betHandicapWrap">让球数<input class="input" id="betHandicap" type="number" step="0.5" min="-10" max="10"></label><div class="control-row"><label>参考赔率<input class="input" id="betOdds" type="number" min="1.01" step="0.01" required></label><label>金额<input class="input" id="betStake" type="number" min="0.01" step="0.01" required></label></div><button class="btn primary" type="submit">保存这条记录</button></form><div class="panel-sub" id="betMessage" style="margin-top:10px"></div></section></div>
-        </div>
-        <div class="message" id="authMessage"></div>
+        <div class="account-grid"><section class="account-section account-records"><div class="account-section-head"><div><h3>我的下注记录</h3><p class="panel-sub">最近保存的计划与结算结果</p></div><button class="btn" id="refreshBetsBtn" type="button">刷新</button></div><div class="history-list" id="betList"></div></section><section class="account-section account-record-form"><div class="account-section-head"><div><h3>新增下注记录</h3><p class="panel-sub" id="recordMatchInfo">请先在赛事列表中选择一场比赛。</p></div></div><form class="manual-form" id="betForm"><label>足彩玩法<select class="select" id="betPlayType"><option value="spf">胜平负</option><option value="rqspf">让球胜平负</option><option value="bf">比分</option><option value="zjq">总进球</option><option value="bqc">半全场</option></select></label><label>投注选项<select class="select" id="betSelection"></select></label><label class="hidden" id="betHandicapWrap">让球数<input class="input" id="betHandicap" type="number" step="0.5" min="-10" max="10"></label><div class="control-row"><label>参考赔率<input class="input" id="betOdds" type="number" min="1.01" step="0.01" required></label><label>金额<input class="input" id="betStake" type="number" min="0.01" step="0.01" required></label></div><button class="btn primary" type="submit">保存这条记录</button></form><div class="panel-sub" id="betMessage" style="margin-top:10px"></div></section></div>
         </div>
       </div>
     </section>
@@ -929,11 +896,6 @@
       $("accountBtn").addEventListener("click", openAccountLayer);
       $("recordBetBtn").addEventListener("click", openBetRecorder);
       $("accountCloseBtn").addEventListener("click", closeAccountLayer);
-      $("loginForm").addEventListener("submit", loginAccount);
-      $("registerForm").addEventListener("submit", registerAccount);
-      $("showRegisterBtn").addEventListener("click", () => { $("loginForm").classList.add("hidden"); $("registerForm").classList.remove("hidden"); });
-      $("showLoginBtn").addEventListener("click", () => { $("registerForm").classList.add("hidden"); $("loginForm").classList.remove("hidden"); });
-      $("logoutBtn").addEventListener("click", logoutAccount);
       $("refreshBetsBtn").addEventListener("click", loadBetRecords);
       $("betForm").addEventListener("submit", saveBetRecord);
       $("betPlayType").addEventListener("change", () => { syncBetPlayForm(); refreshLatestBetOdds(); });
@@ -947,7 +909,6 @@
       $("manualCancelBtn").addEventListener("click", closeManualLayer);
       $("manualForm").addEventListener("submit", createManualMatch);
       $("deleteManualBtn").addEventListener("click", deleteActiveManualMatch);
-      document.querySelectorAll("[data-account-tab]").forEach(button => button.addEventListener("click", () => activateAccountTab(button.dataset.accountTab)));
     }
 
     async function apiRequest(path, options = {}) {
@@ -1046,27 +1007,14 @@
       document.body.classList.remove("history-open");
     }
 
-    function activateAccountTab(target) {
-      document.querySelectorAll("[data-account-tab]").forEach(button => button.classList.toggle("active", button.dataset.accountTab === target));
-      const section = target === "records" ? $("betList") : target === "create" ? $("betForm") : $("betSummary");
-      section.scrollIntoView({behavior: "smooth", block: "start"});
+    function focusBetRecorder() {
+      $("betForm").scrollIntoView({behavior: "smooth", block: "nearest"});
     }
 
     function updateAccountBadge() {
       $("accountText").textContent = state.user ? state.user.email : "登录 / 注册";
-      $("authGuest").classList.toggle("hidden", Boolean(state.user));
-      $("authMember").classList.toggle("hidden", !state.user);
-      if (state.user) renderAccountProfile();
       updateAdminVisibility();
       if (state.user) loadBetRecords().catch(e => setBetMessage(e.message));
-    }
-
-    function renderAccountProfile() {
-      if (!state.user) return;
-      $("accountEmail").textContent = state.user.email;
-      const expiry = state.user.activation_expires_at;
-      const access = state.user.is_admin ? "管理员 · 永久授权" : (!expiry ? "账号可用" : `授权至 ${formatDateTime(expiry)}`);
-      $("accountPlan").textContent = access;
     }
 
     function updateRecordMatchInfo() {
@@ -1080,46 +1028,9 @@
       $("adminBtnText").textContent = state.adminToken || state.user?.is_admin ? "管理后台" : "管理员登录";
     }
 
-    async function loginAccount(event) {
-      event.preventDefault();
-      setAuthMessage("登录中...");
-      try {
-        const payload = await apiRequest("/auth/login", {method: "POST", body: JSON.stringify({email: $("authEmail").value, password: $("authPassword").value})});
-        state.authToken = payload.token;
-        state.user = payload.user;
-        localStorage.setItem("football_ai_session", state.authToken);
-        updateAccountBadge();
-        await loadBetRecords();
-        setAuthMessage("登录成功。");
-      } catch (error) { setAuthMessage(error.message); }
-    }
-
-    async function registerAccount(event) {
-      event.preventDefault();
-      setAuthMessage("注册中...");
-      try {
-        const activationCode = $("registerActivationCode").value.trim();
-        const payload = await apiRequest("/auth/register", {method: "POST", body: JSON.stringify({email: $("registerEmail").value, password: $("registerPassword").value, activation_code: activationCode || null})});
-        setAuthMessage(payload.message);
-      } catch (error) { setAuthMessage(error.message); }
-    }
-
-    function logoutAccount({remote = true} = {}) {
-      if (remote) fetch("/api/auth/logout", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": state.csrfToken}}).catch(() => {});
-      state.authToken = "";
-      state.user = null;
-      state.adminToken = "";
-      localStorage.removeItem("football_ai_session");
-      localStorage.removeItem("football_ai_admin_session");
-      location.href = "/login.html";
-    }
-
     async function loadBetRecords() {
       try {
-        const [summary, records] = await Promise.all([apiRequest("/bets/summary"), apiRequest("/bets")]);
-        $("betSummary").innerHTML = [
-          ["记录", summary.count], ["待结算", summary.pending], ["胜 / 负", `${summary.won} / ${summary.lost}`], ["累计盈利", summary.profit.toFixed(2)]
-        ].map(([label, value]) => `<div class="summary-item"><span>${label}</span><b>${escapeHtml(value)}</b></div>`).join("");
+        const records = await apiRequest("/bets");
         $("betList").innerHTML = records.items.length ? records.items.map(renderBetRecord).join("") : '<div class="panel-sub">还没有下注记录。</div>';
       } catch (error) { setBetMessage(error.message); }
     }
@@ -1131,7 +1042,7 @@
       const status = {pending: "待结算", won: "已命中", lost: "未命中"};
       const selection = bet.play_type === "spf" || bet.play_type === "rqspf" ? (labels[bet.selection] || bet.selection) : (bet.play_type === "bqc" ? (bqcLabels[bet.selection] || bet.selection) : bet.selection);
       const handicap = bet.handicap === null || bet.handicap === undefined ? "" : ` · 让${bet.handicap}`;
-      return `<div class="history-row"><div><b>${escapeHtml(bet.match_id)}</b><small>${playLabels[bet.play_type] || bet.play_type} · ${selection}${handicap} · ${bet.odds} · ${bet.stake}</small></div><div class="history-hit">${status[bet.status] || bet.status}<br><small>${bet.profit === null ? "--" : Number(bet.profit).toFixed(2)}</small></div></div>`;
+      return `<div class="history-row"><div><b>${escapeHtml(bet.match_name || bet.match_id)}</b><small>${playLabels[bet.play_type] || bet.play_type} · ${selection}${handicap} · ${bet.odds} · ${bet.stake}</small></div><div class="history-hit">${status[bet.status] || bet.status}<br><small>${bet.profit === null ? "--" : Number(bet.profit).toFixed(2)}</small></div></div>`;
     }
 
     async function openBetRecorder() {
@@ -1145,7 +1056,7 @@
       updateRecordMatchInfo();
       $("accountLayer").classList.remove("hidden");
       document.body.classList.add("history-open");
-      activateAccountTab("create");
+      focusBetRecorder();
       await refreshLatestBetOdds();
     }
 
@@ -1195,7 +1106,6 @@
       } catch (error) { setBetMessage(error.message); }
     }
 
-    function setAuthMessage(value) { $("authMessage").textContent = value; }
     function setBetMessage(value) { $("betMessage").textContent = value; }
 
     async function init() {

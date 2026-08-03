@@ -107,6 +107,7 @@ class Bet(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     match_id: Mapped[str] = mapped_column(String(120), index=True)
+    match_name: Mapped[str | None] = mapped_column(String(320), nullable=True)
     play_type: Mapped[str] = mapped_column(String(16), default="spf", index=True)
     selection: Mapped[str] = mapped_column(String(10))
     handicap: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -144,6 +145,8 @@ def initialize_database() -> None:
             connection.execute(text("ALTER TABLE bets ADD COLUMN play_type VARCHAR(16) NOT NULL DEFAULT 'spf'"))
         if "handicap" not in bet_columns:
             connection.execute(text("ALTER TABLE bets ADD COLUMN handicap FLOAT NULL"))
+        if "match_name" not in bet_columns:
+            connection.execute(text("ALTER TABLE bets ADD COLUMN match_name VARCHAR(320) NULL"))
         activation_code_columns = {column["name"] for column in inspector.get_columns("activation_codes")}
         if "grant_days" not in activation_code_columns:
             connection.execute(text("ALTER TABLE activation_codes ADD COLUMN grant_days INTEGER NULL"))
@@ -512,10 +515,19 @@ def user_payload(user: User) -> dict:
     }
 
 
-def bet_payload(bet: Bet) -> dict:
+def match_display_name(match: dict | None) -> str | None:
+    if not match:
+        return None
+    home = str(match.get("home") or "").strip()
+    away = str(match.get("away") or "").strip()
+    return f"{home} vs {away}" if home and away else home or away or None
+
+
+def bet_payload(bet: Bet, match_name: str | None = None) -> dict:
     return {
         "id": bet.id,
         "match_id": bet.match_id,
+        "match_name": match_name or bet.match_name,
         "play_type": bet.play_type,
         "selection": bet.selection,
         "handicap": bet.handicap,
@@ -998,13 +1010,14 @@ def selection_is_valid(play_type: str, selection: str) -> bool:
 
 @app.post("/api/bets", dependencies=[Depends(csrf_protect)])
 def create_bet(payload: BetRequest, user: User = Depends(current_user), db: Session = Depends(db_session)) -> dict:
-    if not any(str(match.get("id")) == payload.match_id for match in load_matches(db)):
+    match = next((item for item in load_matches(db) if str(item.get("id")) == payload.match_id), None)
+    if not match:
         raise HTTPException(status_code=404, detail="赛事不存在或尚未同步")
     if not selection_is_valid(payload.play_type, payload.selection):
         raise HTTPException(status_code=422, detail="玩法选项不符合该足彩玩法")
     if payload.play_type == "rqspf" and payload.handicap is None:
         raise HTTPException(status_code=422, detail="让球胜平负必须填写让球数")
-    bet = Bet(user_id=user.id, match_id=payload.match_id, play_type=payload.play_type, selection=payload.selection, handicap=payload.handicap, odds=payload.odds, stake=payload.stake)
+    bet = Bet(user_id=user.id, match_id=payload.match_id, match_name=match_display_name(match), play_type=payload.play_type, selection=payload.selection, handicap=payload.handicap, odds=payload.odds, stake=payload.stake)
     db.add(bet)
     db.commit()
     db.refresh(bet)
@@ -1015,7 +1028,8 @@ def create_bet(payload: BetRequest, user: User = Depends(current_user), db: Sess
 def list_bets(user: User = Depends(current_user), db: Session = Depends(db_session)) -> dict:
     settle_all(db)
     bets = db.scalars(select(Bet).where(Bet.user_id == user.id).order_by(Bet.created_at.desc())).all()
-    return {"items": [bet_payload(bet) for bet in bets]}
+    matches = {str(match.get("id")): match for match in load_matches(db)}
+    return {"items": [bet_payload(bet, match_display_name(matches.get(str(bet.match_id)))) for bet in bets]}
 
 
 @app.get("/api/bets/summary")
