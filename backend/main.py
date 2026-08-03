@@ -189,6 +189,12 @@ DATA_UPDATE_LOCK = threading.Lock()
 DATA_UPDATE_STATUS_LOCK = threading.Lock()
 DATA_UPDATE_LOG = ROOT / "logs" / "data_update.log"
 DATA_UPDATE_STATUS = {"running": False, "message": "", "output": "", "started_at": None, "finished_at": None, "duration_seconds": None}
+try:
+    DATA_UPDATE_INTERVAL_HOURS = max(1, int(os.getenv("DATA_UPDATE_INTERVAL_HOURS", "2")))
+except ValueError:
+    DATA_UPDATE_INTERVAL_HOURS = 2
+DATA_UPDATE_STOP_EVENT = threading.Event()
+DATA_UPDATE_SCHEDULER_STARTED = False
 JSON_SNAPSHOT_FILES = {
     "matches": ROOT / "data" / "matches.json",
     "history": ROOT / "data" / "jc_history.json",
@@ -768,13 +774,50 @@ def reset_admin_password(payload: AdminPasswordResetRequest, session: AdminSessi
 
 @app.post("/api/admin/update-data", dependencies=[Depends(csrf_protect)])
 def admin_update_data(_: AdminSession = Depends(current_admin)) -> dict:
+    if not start_data_update("管理员手动触发"):
+        raise HTTPException(status_code=409, detail="赛事数据更新正在进行中，请稍后查看")
+    return {"status": "started", "message": "赛事数据更新已在后台启动，请稍后查看结果"}
+
+
+def start_data_update(trigger: str) -> bool:
     with DATA_UPDATE_STATUS_LOCK:
         if DATA_UPDATE_STATUS["running"]:
-            raise HTTPException(status_code=409, detail="赛事数据更新正在进行中，请稍后查看")
-        DATA_UPDATE_STATUS.update(running=True, message="赛事数据更新已在后台启动", output="", started_at=now().isoformat(), finished_at=None, duration_seconds=None)
-    write_update_log("赛事数据更新启动")
+            return False
+        DATA_UPDATE_STATUS.update(
+            running=True,
+            message="赛事数据更新已在后台启动",
+            output="",
+            started_at=now().isoformat(),
+            finished_at=None,
+            duration_seconds=None,
+        )
+    write_update_log(f"赛事数据更新启动（{trigger}）")
     threading.Thread(target=run_data_update, daemon=True).start()
-    return {"status": "started", "message": "赛事数据更新已在后台启动，请稍后查看结果"}
+    return True
+
+
+def data_update_scheduler() -> None:
+    """Run the updater at a fixed interval without overlapping manual jobs."""
+    interval_seconds = DATA_UPDATE_INTERVAL_HOURS * 3600
+    while not DATA_UPDATE_STOP_EVENT.wait(interval_seconds):
+        if not start_data_update(f"每 {DATA_UPDATE_INTERVAL_HOURS} 小时自动更新"):
+            write_update_log("自动更新跳过：已有赛事数据更新任务正在进行")
+
+
+@app.on_event("startup")
+def start_data_update_scheduler() -> None:
+    global DATA_UPDATE_SCHEDULER_STARTED
+    if DATA_UPDATE_SCHEDULER_STARTED:
+        return
+    DATA_UPDATE_SCHEDULER_STARTED = True
+    DATA_UPDATE_STOP_EVENT.clear()
+    threading.Thread(target=data_update_scheduler, name="data-update-scheduler", daemon=True).start()
+    write_update_log(f"赛事数据自动更新已启用：每 {DATA_UPDATE_INTERVAL_HOURS} 小时执行一次")
+
+
+@app.on_event("shutdown")
+def stop_data_update_scheduler() -> None:
+    DATA_UPDATE_STOP_EVENT.set()
 
 
 def run_data_update() -> None:
