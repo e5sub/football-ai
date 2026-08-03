@@ -108,6 +108,8 @@ class Bet(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     match_id: Mapped[str] = mapped_column(String(120), index=True)
     match_name: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    pass_type: Mapped[str] = mapped_column(String(16), default="single")
+    parlay_legs: Mapped[list | None] = mapped_column(JSON, nullable=True)
     play_type: Mapped[str] = mapped_column(String(16), default="spf", index=True)
     selection: Mapped[str] = mapped_column(String(10))
     handicap: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -147,6 +149,10 @@ def initialize_database() -> None:
             connection.execute(text("ALTER TABLE bets ADD COLUMN handicap FLOAT NULL"))
         if "match_name" not in bet_columns:
             connection.execute(text("ALTER TABLE bets ADD COLUMN match_name VARCHAR(320) NULL"))
+        if "pass_type" not in bet_columns:
+            connection.execute(text("ALTER TABLE bets ADD COLUMN pass_type VARCHAR(16) NOT NULL DEFAULT 'single'"))
+        if "parlay_legs" not in bet_columns:
+            connection.execute(text("ALTER TABLE bets ADD COLUMN parlay_legs JSON NULL"))
         activation_code_columns = {column["name"] for column in inspector.get_columns("activation_codes")}
         if "grant_days" not in activation_code_columns:
             connection.execute(text("ALTER TABLE activation_codes ADD COLUMN grant_days INTEGER NULL"))
@@ -251,13 +257,26 @@ class LoginRequest(RegisterRequest):
     pass
 
 
-class BetRequest(BaseModel):
+class ParlayLegRequest(BaseModel):
     match_id: str = Field(min_length=1, max_length=120)
     play_type: str = Field(default="spf", pattern="^(spf|rqspf|bf|zjq|bqc)$")
     selection: str
     handicap: float | None = Field(default=None, ge=-10, le=10)
     odds: float = Field(gt=1, le=1000)
+
+
+class BetRequest(ParlayLegRequest):
     stake: float = Field(gt=0, le=1000000)
+    pass_type: str = Field(default="single", pattern="^(single|2x1|3x1|4x1)$")
+    legs: list[ParlayLegRequest] = Field(default_factory=list, max_length=4)
+
+
+class BetUpdateRequest(BaseModel):
+    play_type: str | None = Field(default=None, pattern="^(spf|rqspf|bf|zjq|bqc)$")
+    selection: str | None = None
+    handicap: float | None = Field(default=None, ge=-10, le=10)
+    odds: float | None = Field(default=None, gt=1, le=1000)
+    stake: float | None = Field(default=None, gt=0, le=1000000)
 
 
 class AdminLoginRequest(BaseModel):
@@ -528,6 +547,8 @@ def bet_payload(bet: Bet, match_name: str | None = None) -> dict:
         "id": bet.id,
         "match_id": bet.match_id,
         "match_name": match_name or bet.match_name,
+        "pass_type": bet.pass_type,
+        "legs": bet.parlay_legs or [],
         "play_type": bet.play_type,
         "selection": bet.selection,
         "handicap": bet.handicap,
@@ -1010,14 +1031,23 @@ def selection_is_valid(play_type: str, selection: str) -> bool:
 
 @app.post("/api/bets", dependencies=[Depends(csrf_protect)])
 def create_bet(payload: BetRequest, user: User = Depends(current_user), db: Session = Depends(db_session)) -> dict:
-    match = next((item for item in load_matches(db) if str(item.get("id")) == payload.match_id), None)
-    if not match:
-        raise HTTPException(status_code=404, detail="赛事不存在或尚未同步")
-    if not selection_is_valid(payload.play_type, payload.selection):
-        raise HTTPException(status_code=422, detail="玩法选项不符合该足彩玩法")
-    if payload.play_type == "rqspf" and payload.handicap is None:
-        raise HTTPException(status_code=422, detail="让球胜平负必须填写让球数")
-    bet = Bet(user_id=user.id, match_id=payload.match_id, match_name=match_display_name(match), play_type=payload.play_type, selection=payload.selection, handicap=payload.handicap, odds=payload.odds, stake=payload.stake)
+    matches = {str(match.get("id")): match for match in load_matches(db)}
+    legs = payload.legs or [ParlayLegRequest(match_id=payload.match_id, play_type=payload.play_type, selection=payload.selection, handicap=payload.handicap, odds=payload.odds)]
+    expected_legs = {"single": 1, "2x1": 2, "3x1": 3, "4x1": 4}[payload.pass_type]
+    if len(legs) != expected_legs:
+        raise HTTPException(status_code=422, detail=f"{payload.pass_type}需要选择{expected_legs}场不同赛事")
+    if len({leg.match_id for leg in legs}) != len(legs):
+        raise HTTPException(status_code=422, detail="串关赛事不能重复")
+    for leg in legs:
+        if leg.match_id not in matches:
+            raise HTTPException(status_code=404, detail="赛事不存在或尚未同步")
+        if not selection_is_valid(leg.play_type, leg.selection):
+            raise HTTPException(status_code=422, detail="玩法选项不符合该足彩玩法")
+        if leg.play_type == "rqspf" and leg.handicap is None:
+            raise HTTPException(status_code=422, detail="让球胜平负必须填写让球数")
+    first_leg = legs[0]
+    serialized_legs = [{**leg.model_dump(), "match_name": match_display_name(matches[leg.match_id])} for leg in legs]
+    bet = Bet(user_id=user.id, match_id=first_leg.match_id, match_name=match_display_name(matches[first_leg.match_id]), pass_type=payload.pass_type, parlay_legs=serialized_legs if payload.pass_type != "single" else None, play_type=first_leg.play_type, selection=first_leg.selection, handicap=first_leg.handicap, odds=first_leg.odds, stake=payload.stake)
     db.add(bet)
     db.commit()
     db.refresh(bet)
@@ -1030,6 +1060,48 @@ def list_bets(user: User = Depends(current_user), db: Session = Depends(db_sessi
     bets = db.scalars(select(Bet).where(Bet.user_id == user.id).order_by(Bet.created_at.desc())).all()
     matches = {str(match.get("id")): match for match in load_matches(db)}
     return {"items": [bet_payload(bet, match_display_name(matches.get(str(bet.match_id)))) for bet in bets]}
+
+
+@app.patch("/api/bets/{bet_id}", dependencies=[Depends(csrf_protect)])
+def update_bet(bet_id: int, payload: BetUpdateRequest, user: User = Depends(current_user), db: Session = Depends(db_session)) -> dict:
+    settle_all(db)
+    bet = db.get(Bet, bet_id)
+    if not bet or bet.user_id != user.id:
+        raise HTTPException(status_code=404, detail="下注记录不存在")
+    if bet.status != "pending":
+        raise HTTPException(status_code=409, detail="已结算记录不能修改")
+
+    play_type = payload.play_type or bet.play_type
+    selection = payload.selection or bet.selection
+    if not selection_is_valid(play_type, selection):
+        raise HTTPException(status_code=422, detail="玩法选项不符合该足彩玩法")
+    handicap = payload.handicap if "handicap" in payload.model_fields_set else bet.handicap
+    if play_type == "rqspf" and handicap is None:
+        raise HTTPException(status_code=422, detail="让球胜平负必须填写让球数")
+
+    bet.play_type = play_type
+    bet.selection = selection
+    bet.handicap = handicap if play_type == "rqspf" else None
+    if payload.odds is not None:
+        bet.odds = payload.odds
+    if payload.stake is not None:
+        bet.stake = payload.stake
+    db.commit()
+    db.refresh(bet)
+    return bet_payload(bet)
+
+
+@app.delete("/api/bets/{bet_id}", dependencies=[Depends(csrf_protect)])
+def delete_bet(bet_id: int, user: User = Depends(current_user), db: Session = Depends(db_session)) -> dict:
+    settle_all(db)
+    bet = db.get(Bet, bet_id)
+    if not bet or bet.user_id != user.id:
+        raise HTTPException(status_code=404, detail="下注记录不存在")
+    if bet.status != "pending":
+        raise HTTPException(status_code=409, detail="已结算记录不能删除")
+    db.delete(bet)
+    db.commit()
+    return {"ok": True}
 
 
 @app.get("/api/bets/summary")
@@ -1116,6 +1188,26 @@ def settle_all(db: Session) -> int:
     bets = db.scalars(select(Bet).where(Bet.status == "pending")).all()
     settled = 0
     for bet in bets:
+        if bet.parlay_legs:
+            leg_results = []
+            for leg in bet.parlay_legs:
+                leg_bet = Bet(match_id=leg["match_id"], play_type=leg["play_type"], selection=leg["selection"], handicap=leg.get("handicap"), odds=leg["odds"], stake=bet.stake)
+                result = bet_result(matches.get(str(leg["match_id"]), {}), leg_bet)
+                if not result:
+                    leg_results = []
+                    break
+                leg_results.append((leg, result))
+            if not leg_results:
+                continue
+            bet.result = "串关命中" if all(leg["selection"] == result for leg, result in leg_results) else "串关未命中"
+            bet.status = "won" if bet.result == "串关命中" else "lost"
+            combined_odds = 1.0
+            for leg, _ in leg_results:
+                combined_odds *= float(leg["odds"])
+            bet.profit = round(bet.stake * (combined_odds - 1), 2) if bet.status == "won" else round(-bet.stake, 2)
+            bet.settled_at = now()
+            settled += 1
+            continue
         result = bet_result(matches.get(str(bet.match_id), {}), bet)
         if not result:
             continue
