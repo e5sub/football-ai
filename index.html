@@ -224,8 +224,9 @@
       pointer-events: none;
     }
     .final-content { position: relative; z-index: 1; }
+    .final-bet-button { position: absolute; z-index: 2; top: 16px; right: 16px; min-width: 132px; }
     .kicker { color: var(--cyan); font-size: 12px; font-weight: 800; letter-spacing: 0; }
-    .match-title { margin: 10px 0 6px; font-size: 34px; line-height: 1.08; letter-spacing: 0; overflow-wrap: anywhere; }
+    .match-title { margin: 10px 0 6px; padding-right: 145px; font-size: 34px; line-height: 1.08; letter-spacing: 0; overflow-wrap: anywhere; }
     .league-line { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
     .decision-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
     .decision-box {
@@ -546,7 +547,8 @@
       .history-list { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
       .history-hit { text-align: left; }
       .brand { align-items: flex-start; }
-      .match-title { font-size: 28px; }
+      .final-bet-button { top: 12px; right: 12px; min-width: 116px; height: 34px; }
+      .match-title { padding-right: 124px; font-size: 28px; }
       .brand p { max-width: min(280px, calc(100vw - 96px)); line-height: 1.35; word-break: break-word; }
       .panel-head { flex-wrap: wrap; }
       .account-profile,.account-section-head { align-items: flex-start; flex-direction: column; }
@@ -610,6 +612,7 @@
       <section class="center-col">
         <div class="hero-grid">
           <article class="final-card">
+            <button class="btn primary final-bet-button" id="recordBetBtn" type="button">＋ 记录下注</button>
             <div class="final-content">
               <div class="kicker" id="matchKicker">统一研判结论</div>
               <h2 class="match-title" id="matchTitle">等待载入赛事</h2>
@@ -923,6 +926,7 @@
       $("historyBtn").addEventListener("click", openHistoryLayer);
       $("historyCloseBtn").addEventListener("click", closeHistoryLayer);
       $("accountBtn").addEventListener("click", openAccountLayer);
+      $("recordBetBtn").addEventListener("click", openBetRecorder);
       $("accountCloseBtn").addEventListener("click", closeAccountLayer);
       $("loginForm").addEventListener("submit", loginAccount);
       $("registerForm").addEventListener("submit", registerAccount);
