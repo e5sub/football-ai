@@ -470,6 +470,8 @@
     .account-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(340px,1.08fr); gap: 0; }
     .account-records { min-height: 0; }
     .account-records .history-list { max-height: 315px; overflow: auto; }
+    .account-records .history-row { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+    .account-records .history-row small { white-space: nowrap; }
     .account-record-form { border-left: 1px solid var(--line2); }
     .account-record-form .manual-form { max-width: 430px; }
     .account-workbench > header { position: relative; padding: 20px 72px 18px 24px; border-bottom: 1px solid var(--line2); }
