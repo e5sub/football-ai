@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Football Betting</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .match {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .match-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .team-names {
+            font-weight: bold;
+        }
+        .match-details {
+            font-size: 0.8em;
+            color: #888;
+        }
+        .odds {
+            display: flex;
+        }
+        .odd {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            margin-left: 5px;
+            cursor: pointer;
+        }
+        .odd:hover {
+            background-color: #f0f0f0;
+        }
+        .odd.selected {
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="matches-container">
+        </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('./data/matches.json')
+                .then(response => response.json())
+                .then(data => {
+                    const matchesContainer = document.getElementById('matches-container');
+                    const matches = data.matches; 
+
+                    matches.forEach(match => {
+                        const matchElement = document.createElement('div');
+                        matchElement.classList.add('match');
+
+                        const matchInfo = document.createElement('div');
+                        matchInfo.classList.add('match-info');
+
+                        const teamNames = document.createElement('div');
+                        teamNames.classList.add('team-names');
+                        teamNames.textContent = `${match.host} vs ${match.guest}`;
+                        
+                        const matchDetails = document.createElement('div');
+                        matchDetails.classList.add('match-details');
+                        const matchDate = new Date(match.time);
+                        matchDetails.textContent = `${match.league} - ${matchDate.toLocaleString()}`;
+
+                        matchInfo.appendChild(teamNames);
+                        matchInfo.appendChild(matchDetails);
+
+                        const oddsElement = document.createElement('div');
+                        oddsElement.classList.add('odds');
+                        
+                        const homeOdds = document.createElement('div');
+                        homeOdds.classList.add('odd');
+                        homeOdds.textContent = `Win ${match.odds.h.toFixed(2)}`;
+                        homeOdds.onclick = () => {
+                            toggleSelected(homeOdds);
+                        };
+
+                        const drawOdds = document.createElement('div');
+                        drawOdds.classList.add('odd');
+                        drawOdds.textContent = `Draw ${match.odds.d.toFixed(2)}`;
+                        drawOdds.onclick = () => {
+                            toggleSelected(drawOdds);
+                        };
+
+                        const awayOdds = document.createElement('div');
+                        awayOdds.classList.add('odd');
+                        awayOdds.textContent = `Lose ${match.odds.a.toFixed(2)}`;
+                        awayOdds.onclick = () => {
+                            toggleSelected(awayOdds);
+                        };
+                        
+                        oddsElement.appendChild(homeOdds);
+                        oddsElement.appendChild(drawOdds);
+                        oddsElement.appendChild(awayOdds);
+
+                        matchElement.appendChild(matchInfo);
+                        matchElement.appendChild(oddsElement);
+
+                        matchesContainer.appendChild(matchElement);
+                    });
+                });
+        });
+
+        function toggleSelected(element) {
+            element.classList.toggle('selected');
+        }
+    </script>
+</body>
+</html>
