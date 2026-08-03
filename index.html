@@ -816,7 +816,7 @@
         <button class="icon-btn" id="accountCloseBtn" type="button" aria-label="关闭下注记录" title="关闭">×</button>
       </header>
       <div class="license-body account-layout">
-        <div class="account-grid"><section class="account-section account-records"><div class="account-section-head"><div><h3>我的下注记录</h3><p class="panel-sub">最近保存的计划与结算结果</p></div><button class="btn" id="refreshBetsBtn" type="button">刷新</button></div><div class="history-list" id="betList"></div></section><section class="account-section account-record-form"><div class="account-section-head"><div><h3>新增下注记录</h3><p class="panel-sub" id="recordMatchInfo">请先在赛事列表中选择一场比赛。</p></div></div><form class="manual-form" id="betForm"><label>足彩玩法<select class="select" id="betPlayType"><option value="spf">胜平负</option><option value="rqspf">让球胜平负</option><option value="bf">比分</option><option value="zjq">总进球</option><option value="bqc">半全场</option></select></label><label>投注选项<select class="select" id="betSelection"></select></label><label class="hidden" id="betHandicapWrap">让球数<input class="input" id="betHandicap" type="number" step="0.5" min="-10" max="10"></label><div class="control-row"><label>参考赔率<input class="input" id="betOdds" type="number" min="1.01" step="0.01" required></label><label>金额<input class="input" id="betStake" type="number" min="0.01" step="0.01" required></label></div><button class="btn primary" type="submit">保存这条记录</button></form><div class="panel-sub" id="betMessage" style="margin-top:10px"></div></section></div>
+        <div class="account-grid"><section class="account-section account-records"><div class="account-section-head"><div><h3>我的下注记录</h3><p class="panel-sub">最近保存的计划与结算结果</p></div><button class="btn" id="refreshBetsBtn" type="button">刷新</button></div><div class="history-list" id="betList"></div></section><section class="account-section account-record-form"><div class="account-section-head"><div><h3>新增下注记录</h3><p class="panel-sub" id="recordMatchInfo">请先在赛事列表中选择一场比赛。</p></div></div><form class="manual-form" id="betForm"><label>足彩玩法<select class="select" id="betPlayType"><option value="spf">胜平负</option><option value="rqspf">让球胜平负</option><option value="bf">比分</option><option value="zjq">总进球</option><option value="bqc">半全场</option></select></label><label>投注选项<select class="select" id="betSelection"></select></label><label class="hidden" id="betHandicapWrap">让球数<input class="input" id="betHandicap" type="number" step="0.5" min="-10" max="10"></label><div class="control-row"><label>参考赔率<input class="input" id="betOdds" type="number" min="1.01" step="0.01" required></label><label>投注金额<input class="input" id="betStake" type="number" min="0.01" step="0.01" required></label></div><button class="btn primary" type="submit">保存这条记录</button></form><div class="panel-sub" id="betMessage" style="margin-top:10px"></div></section></div>
         </div>
       </div>
     </section>
@@ -1042,7 +1042,7 @@
       const status = {pending: "待结算", won: "已命中", lost: "未命中"};
       const selection = bet.play_type === "spf" || bet.play_type === "rqspf" ? (labels[bet.selection] || bet.selection) : (bet.play_type === "bqc" ? (bqcLabels[bet.selection] || bet.selection) : bet.selection);
       const handicap = bet.handicap === null || bet.handicap === undefined ? "" : ` · 让${bet.handicap}`;
-      return `<div class="history-row"><div><b>${escapeHtml(bet.match_name || bet.match_id)}</b><small>${playLabels[bet.play_type] || bet.play_type} · ${selection}${handicap} · ${bet.odds} · ${bet.stake}</small></div><div class="history-hit">${status[bet.status] || bet.status}<br><small>${bet.profit === null ? "--" : Number(bet.profit).toFixed(2)}</small></div></div>`;
+      return `<div class="history-row"><div><b>${escapeHtml(bet.match_name || bet.match_id)}</b><small>${playLabels[bet.play_type] || bet.play_type} · ${selection}${handicap} · 参考赔率 ${bet.odds} · 投注金额 ${bet.stake}</small></div><div class="history-hit">${status[bet.status] || bet.status}<br><small>${bet.profit === null ? "--" : Number(bet.profit).toFixed(2)}</small></div></div>`;
     }
 
     async function openBetRecorder() {
@@ -1077,6 +1077,7 @@
       const match = activeMatch();
       if (!match) return;
       const playType = $("betPlayType").value;
+      const playTypeLabel = {spf: "胜平负", rqspf: "让球胜平负", bf: "比分", zjq: "总进球", bqc: "半全场"}[playType] || playType;
       const selection = $("betSelection").value;
       try {
         const payload = await fetchJsonWithTimeout(`/api/data/matches/${encodeURIComponent(match.id)}/odds?play_type=${playType}`, 5000);
@@ -1088,7 +1089,7 @@
         $("betSelection").value = activeSelection;
         const latestOdds = payload.odds?.[activeSelection];
         $("betOdds").value = latestOdds ?? "";
-        $("betMessage").textContent = latestOdds ? `已载入最新${playType}赔率：${latestOdds}` : `当前赛事暂无${playType}玩法最新赔率，请先在本地更新赛事数据。`;
+        $("betMessage").textContent = latestOdds ? `已载入最新${playTypeLabel}赔率：${latestOdds}` : `当前赛事暂无${playTypeLabel}玩法最新赔率，请先在本地更新赛事数据。`;
       } catch (error) {
         $("betOdds").value = "";
         $("betMessage").textContent = "最新赔率获取失败，请刷新本地赛事数据后重试。";
