@@ -574,7 +574,7 @@
         <button class="badge badge-button" id="historyBtn" type="button"><span class="icon">↺</span>历史回看</button>
         <button class="badge badge-button" id="accountBtn" type="button"><span class="icon">◎</span><span id="accountText">登录 / 注册</span></button>
         <button class="badge badge-button" id="adminBtn" type="button"><span class="icon">⚙</span><span id="adminBtnText">管理员登录</span></button>
-        <span class="badge"><span class="dot" id="updateDot"></span><span id="updateText">500数据检查中</span></span>
+        <span class="badge" id="updateBadge" title="数据更新时间：检查中"><span class="dot" id="updateDot"></span><span id="updateText">500数据检查中</span></span>
         <span class="badge">历史样本 <b class="mono" id="historySample">--</b></span>
         <span class="badge">赛事 <b class="mono" id="matchCount">--</b></span>
       </div>
@@ -1257,6 +1257,10 @@
       $("dataTime").textContent = meta.historyRange || formatDate(meta.generatedAt);
       const updateStatus = meta.dailyUpdate?.status || (meta.source?.includes("500") ? "success" : "static");
       $("updateText").textContent = updateStatus === "offline-cache" ? "网络波动·使用本地缓存" : (updateStatus === "offline-no-cache" ? "网络不可用·演示数据" : (updateStatus === "failed-preserved" ? "500更新失败·保留旧版" : (updateStatus === "success-no-current-matches" ? "500已更新·当前无竞彩" : (updateStatus === "success" ? "500数据已更新" : "静态数据包"))));
+      const updatedAt = meta.generatedAt || meta.updatedAt;
+      const updateTooltip = `数据更新时间：${updatedAt ? formatDateTime(updatedAt) : "暂无记录"}`;
+      $("updateBadge").title = updateTooltip;
+      $("updateBadge").setAttribute("aria-label", updateTooltip);
       $("updateDot").classList.toggle("warn", ["failed-preserved", "offline-cache", "offline-no-cache"].includes(updateStatus));
       $("complianceText").textContent = meta.compliance || "仅提供体育数据分析、赛前研究与内容创作参考；不涉及赌博，不提供下注服务，不承诺结果。";
       renderLeagueFilter();
