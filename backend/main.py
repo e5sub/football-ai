@@ -260,6 +260,11 @@ class AdminPasswordResetRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class UserPasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 DURATION_GRANT_DAYS = {"month": 30, "half_year": 180, "year": 365}
 DurationLiteral = Literal["month", "half_year", "year", "permanent"]
 
@@ -715,6 +720,23 @@ def me(response: Response, user: User = Depends(current_user_lenient)) -> dict:
     response.set_cookie(AUTH_COOKIE, remember_token(user, expires_at), httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     response.set_cookie(REMEMBER_COOKIE, remember_token(user, expires_at), httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     return user_payload(user)
+
+
+@app.post("/api/auth/password", dependencies=[Depends(csrf_protect)])
+def change_password(payload: UserPasswordChangeRequest, response: Response, user: User = Depends(current_user_lenient), db: Session = Depends(db_session)) -> dict:
+    if not check_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=401, detail="当前密码错误")
+    user.password_hash = hash_password(payload.new_password)
+    db.query(SessionToken).filter(SessionToken.user_id == user.id).delete()
+    db.commit()
+    # Re-issue the signed session so the member stays signed in: the previous
+    # remember_token is bound to the old password hash and would now be rejected.
+    expires_at = now() + timedelta(days=SESSION_DAYS)
+    raw_token = remember_token(user, expires_at)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.set_cookie(AUTH_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
+    response.set_cookie(REMEMBER_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
+    return {"message": "密码已更新", "token": raw_token, "user": user_payload(user)}
 
 
 @app.post("/api/admin/login", dependencies=[Depends(csrf_protect)])

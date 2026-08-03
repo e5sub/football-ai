@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>用户中心｜AI 足球赛事研判</title>
+  <title>用户中心｜AI足球赛事预测系统</title>
   <style>
     :root{--bg:#071019;--panel:#0d1824;--line:#26394b;--text:#eff7ff;--muted:#94a8ba;--cyan:#41d4ff;--green:#37dfaa;--amber:#ffca63;--red:#ff7389;font-family:Inter,"Microsoft YaHei",system-ui,sans-serif}
     *{box-sizing:border-box}
@@ -48,6 +48,7 @@
     .renew-form{display:flex;gap:8px;flex-wrap:wrap}
     .renew-form .field{flex:1;min-width:180px}
     .renew-notice{min-height:18px;color:var(--amber);font-size:12px;margin:10px 0 0}
+    .password-form{display:flex;flex-direction:column;gap:9px;max-width:420px}
     /* stats */
     .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
     .stat{border-radius:12px;padding:14px;transition:transform .15s,box-shadow .15s}
@@ -98,6 +99,16 @@
         <div class="records" id="records"></div>
         <p class="notice" id="notice"></p>
       </section>
+      <section class="card" id="passwordCard">
+        <div class="card-head"><div><h2>修改密码</h2><p class="hint">需先验证当前密码；更新后其他设备需用新密码重新登录，本页保持登录。</p></div></div>
+        <form class="password-form" id="passwordForm">
+          <input class="field" id="currentPassword" type="password" autocomplete="current-password" placeholder="当前密码" required>
+          <input class="field" id="newPassword" type="password" minlength="8" autocomplete="new-password" placeholder="新密码（至少 8 位）" required>
+          <input class="field" id="confirmPassword" type="password" minlength="8" autocomplete="new-password" placeholder="再次输入新密码" required>
+          <button class="btn primary" type="submit">保存新密码</button>
+        </form>
+        <p class="renew-notice" id="passwordNotice"></p>
+      </section>
     </section>
   </main>
   <script>
@@ -130,6 +141,7 @@
         const tag=$('accountStatus');tag.textContent=user.is_admin?'管理员':info.cls==='red'?'已过期':info.cls==='warn'?'即将到期':'账号可用';
         tag.classList.toggle('warn',info.cls==='warn');tag.classList.toggle('red',info.cls==='red');
         $('renewCard').classList.toggle('hidden',user.is_admin);
+        $('passwordCard').classList.toggle('hidden',user.is_admin);
         $('renewCard').classList.toggle('renew-warn',info.cls==='warn');
         $('renewCard').classList.toggle('renew-red',info.cls==='red');
         $('renewHint').textContent=info.hint;
@@ -146,6 +158,7 @@
     $('refreshBtn').onclick=load;
     $('logoutBtn').onclick=async()=>{try{await api('/auth/logout',{method:'POST',body:'{}'})}catch(e){}localStorage.removeItem('football_ai_session');localStorage.removeItem('football_ai_admin_session');location.href='/login.html'};
     $('renewForm').onsubmit=async e=>{e.preventDefault();try{const p=await api('/auth/activate',{method:'POST',body:JSON.stringify({activation_code:$('renewCode').value})});$('renewNotice').textContent=p.message;await load()}catch(err){$('renewNotice').textContent=err.message}};
+    $('passwordForm').onsubmit=async e=>{e.preventDefault();const np=$('newPassword').value,cp=$('confirmPassword').value;if(np!==cp){$('passwordNotice').textContent='两次输入的新密码不一致';return}if(np.length<8){$('passwordNotice').textContent='新密码至少 8 位';return}try{const p=await api('/auth/password',{method:'POST',body:JSON.stringify({current_password:$('currentPassword').value,new_password:np})});state.token=p.token;localStorage.setItem('football_ai_session',p.token);$('passwordNotice').textContent=p.message;$('passwordForm').reset()}catch(err){$('passwordNotice').textContent=err.message}};
     async function init(){await csrf();await load()}
     init();
   </script>
