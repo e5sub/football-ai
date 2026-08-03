@@ -458,7 +458,8 @@
     }
     .manual-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .account-box { width: min(900px, 100%); }
-    .account-workbench { width: min(1100px, 100%); }
+    .account-workbench { width: min(1100px, 100%); max-height: calc(100dvh - 36px); display: flex; flex-direction: column; }
+    .account-workbench > .license-body { min-height: 0; overflow: auto; }
     .account-box > .license-body { padding: 0; gap: 0; }
     .account-box #authGuest { padding: 18px; }
     .account-box > .license-body > .message { margin: 0 18px 14px; }
@@ -946,13 +947,7 @@
       $("manualCancelBtn").addEventListener("click", closeManualLayer);
       $("manualForm").addEventListener("submit", createManualMatch);
       $("deleteManualBtn").addEventListener("click", deleteActiveManualMatch);
-      document.querySelectorAll("[data-account-tab]").forEach(button => button.addEventListener("click", () => {
-        document.querySelectorAll("[data-account-tab]").forEach(item => item.classList.toggle("active", item === button));
-        const target = button.dataset.accountTab;
-        if (target === "records") $("betList").scrollIntoView({behavior: "smooth", block: "start"});
-        if (target === "create") $("betForm").scrollIntoView({behavior: "smooth", block: "start"});
-        if (target === "overview") $("betSummary").scrollIntoView({behavior: "smooth", block: "start"});
-      }));
+      document.querySelectorAll("[data-account-tab]").forEach(button => button.addEventListener("click", () => activateAccountTab(button.dataset.accountTab)));
     }
 
     async function apiRequest(path, options = {}) {
@@ -1046,7 +1041,16 @@
       location.href = "/account.html";
     }
 
-    function closeAccountLayer() { $("accountLayer").classList.add("hidden"); }
+    function closeAccountLayer() {
+      $("accountLayer").classList.add("hidden");
+      document.body.classList.remove("history-open");
+    }
+
+    function activateAccountTab(target) {
+      document.querySelectorAll("[data-account-tab]").forEach(button => button.classList.toggle("active", button.dataset.accountTab === target));
+      const section = target === "records" ? $("betList") : target === "create" ? $("betForm") : $("betSummary");
+      section.scrollIntoView({behavior: "smooth", block: "start"});
+    }
 
     function updateAccountBadge() {
       $("accountText").textContent = state.user ? state.user.email : "登录 / 注册";
@@ -1139,7 +1143,9 @@
       $("betSelection").value = key;
       $("betHandicap").value = match?.handicap ?? "";
       updateRecordMatchInfo();
-      openAccountLayer();
+      $("accountLayer").classList.remove("hidden");
+      document.body.classList.add("history-open");
+      activateAccountTab("create");
       await refreshLatestBetOdds();
     }
 
