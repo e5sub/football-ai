@@ -11,6 +11,7 @@ COPY account.html /app/account.html
 COPY calculator.html /app/calculator.html
 COPY admin.html /app/admin.html
 COPY sw.js /app/sw.js
+COPY assets /app/assets
 COPY data /app/data
 
 ENV PYTHONUNBUFFERED=1 PYTHONPATH=/app

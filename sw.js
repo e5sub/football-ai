@@ -1,7 +1,7 @@
 // Never cache API responses.  In particular, auth/me and csrf responses are
 // user/session specific; caching either makes a browser appear logged out after
 // a refresh and leaves POST requests carrying an expired CSRF token.
-const CACHE_NAME = "football-ai-command-center-v11";
+const CACHE_NAME = "football-ai-command-center-v12";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -9,6 +9,11 @@ const CORE_ASSETS = [
   "./login.html",
   "./account.html",
   "./admin.html",
+  "./assets/calculator/bg_header.png",
+  "./assets/calculator/icon_back.png",
+  "./assets/calculator/icon_more1.png",
+  "./assets/calculator/bg_tip.png",
+  "./assets/calculator/clean.png",
   "./data/matches.json",
   "./data/analysis_archive.json",
   "./data/jc_history.json"
@@ -48,8 +53,10 @@ self.addEventListener("fetch", event => {
   }
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
-      const copy = response.clone();
-      caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+      if (response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+      }
       return response;
     }))
   );
@@ -61,8 +68,10 @@ async function networkFirst(request, fallbackPath) {
       fetch(request),
       new Promise((_, reject) => setTimeout(() => reject(new Error("network timeout")), 6500))
     ]);
-    const copy = response.clone();
-    caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+    if (response.ok) {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+    }
     return response;
   } catch (error) {
     return (await caches.match(request)) || (fallbackPath ? await caches.match(fallbackPath) : Response.error());

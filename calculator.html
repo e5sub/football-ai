@@ -2,154 +2,135 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>竞彩模拟计算器｜AI足球赛事预测系统</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>足球计算器</title>
   <style>
-    :root{--red:#f84a4a;--red-dark:#df3939;--orange:#f5af19;--ink:#181818;--gray:#666;--muted:#999;--bg:#f6f6f6;--line:#e6e6e6;--blue:#3f92d2;font-family:"Microsoft YaHei",system-ui,-apple-system,sans-serif;color:var(--ink)}
-    *{box-sizing:border-box}
-    html,body{margin:0;min-height:100%;background:#ececec}
-    body{font-size:14px}
-    button,input{font:inherit}
-    button{border:0;cursor:pointer}
+    :root{--red:#f84a4a;--ink:#181818;--gray:#666;--muted:#999;--line:#e6e6e6;--paper:#fff;--bg:#fafafa}
+    *{box-sizing:border-box;padding:0;margin:0}
+    html{width:100%;height:100%;font-size:13.3333333vw!important}
+    body{width:100%;min-height:100%;overflow-x:hidden;background:var(--bg);color:var(--ink);font:normal .3rem/1.5 "Microsoft YaHei","PingFang SC",Arial,sans-serif}
+    button{border:0;background:none;color:inherit;font:inherit;cursor:pointer}
+    a{color:inherit;text-decoration:none}
     .hidden{display:none!important}
-    .app{width:min(480px,100%);min-height:100dvh;margin:auto;background:#fff;box-shadow:0 0 28px rgba(0,0,0,.08);display:flex;flex-direction:column}
-    .topbar{position:sticky;top:0;z-index:60;height:48px;flex:0 0 48px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 10px;background:var(--red);color:#fff}
-    .topbar h1{margin:0;font-size:17px;font-weight:600;text-align:center;white-space:nowrap}
-    .nav{display:flex;align-items:center;gap:3px}
-    .nav.right{justify-content:flex-end}
-    .nav a{color:#fff;text-decoration:none;font-size:13px;padding:8px 6px;border-radius:4px;white-space:nowrap}
-    .nav a:hover,.nav a:focus-visible{background:rgba(255,255,255,.16);outline:0}
-    .loading{flex:1;display:grid;place-items:center;color:var(--muted);padding:40px}
-    .main{min-height:0;flex:1;display:flex;flex-direction:column;padding-bottom:112px}
-    .userline{display:flex;justify-content:space-between;gap:10px;padding:7px 11px;background:#fff7f7;border-bottom:1px solid #f6dddd;color:#777;font-size:11px}
-    .userline span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .tabs-wrap{padding:8px 10px 9px;background:#fff;border-bottom:1px solid var(--line)}
-    .tabs{display:flex;gap:4px}
-    .tab{display:flex;flex:1 1 0;min-width:0;height:44px;align-items:center;justify-content:center;flex-direction:column;padding:2px;background:#fff;border:1px solid #d7d7d7;border-radius:5px;color:var(--gray);font-size:13px;line-height:18px}
-    .tab.active{border:2px solid var(--red);color:var(--red)}
-    .search-row{display:flex;gap:6px;margin-top:7px}
-    .search{width:100%;height:34px;padding:0 10px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);outline:0}
-    .search:focus{background:#fff;border-color:var(--red)}
-    .refresh{flex:0 0 54px;border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--gray);font-size:12px}
-    .status{min-height:27px;padding:6px 10px;background:var(--bg);border-bottom:1px solid var(--line);color:#888;font-size:11px;line-height:15px}
-    .status.error{color:var(--red)}
-    .table-scroll{width:100%;overflow-x:auto;background:#fff;-webkit-overflow-scrolling:touch}
-    .match-table{width:100%;min-width:460px;border-collapse:collapse;table-layout:auto;background:#fff}
-    .match-table.wide{min-width:1040px}
-    .match-table.medium{min-width:720px}
-    .match-table th{position:sticky;top:0;z-index:3;padding:8px 3px;background:#fff;border-bottom:1px solid var(--line);color:#333;font-size:12px;font-weight:600;text-align:center;white-space:nowrap}
-    .match-table .info-head{width:142px;min-width:142px;padding-left:10px;text-align:left}
-    .date-row td{padding:6px 10px;background:var(--bg);border-top:1px solid var(--line);color:var(--gray);font-size:12px;font-weight:600}
-    .match-row{border-top:1px solid var(--line)}
-    .match-row td{padding:7px 3px;text-align:center;vertical-align:middle}
-    .match-row .info{width:142px;min-width:142px;padding-left:10px;text-align:left}
-    .league{color:var(--blue);font-size:11px;line-height:16px}
-    .teams{font-size:13px;font-weight:500;line-height:18px}
-    .time{color:var(--gray);font-size:10px}
-    .handicap{display:inline-block;margin-left:3px;padding:0 3px;border:1px solid var(--orange);border-radius:3px;background:#fff8e7;color:var(--orange);font-weight:700}
-    .odds{display:flex;min-width:48px;min-height:48px;width:100%;padding:4px 3px;align-items:center;justify-content:center;flex-direction:column;border:1px solid #d9d9d9;border-radius:5px;background:#fff;color:var(--gray);line-height:18px}
-    .odds:hover:not(:disabled){border-color:var(--orange)}
-    .odds.active{border-color:var(--orange);background:var(--orange);color:#fff}
-    .odds:disabled{background:#fafafa;color:#ccc;cursor:not-allowed}
-    .odds-label{font-size:11px;white-space:nowrap}
-    .odds-value{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
-    .empty{padding:48px 16px;text-align:center;color:var(--muted);font-size:13px}
-    .records{padding:13px 10px 20px;border-top:8px solid var(--bg)}
-    .records-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
-    .records h2{margin:0;font-size:15px}
-    .records-head button{padding:6px 10px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--gray);font-size:12px}
-    .record-list{display:grid;gap:7px}
-    .record{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:10px;border:1px solid var(--line);border-radius:6px;background:#fff}
-    .record b{display:block;font-size:12px;line-height:18px}
-    .record small{display:block;margin-top:3px;color:var(--muted);font-size:10px;line-height:17px;overflow-wrap:anywhere}
-    .record small span{display:block}
-    .record-result{min-width:58px;color:var(--gray);font-size:11px;text-align:center}
-    .record-result.won{color:#169c70}.record-result.lost{color:var(--red)}
-    .record-result small{font-size:11px}
-    .record-actions{display:flex;justify-content:center;gap:5px;margin-top:7px}
-    .record-actions button{height:25px;padding:0 7px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--gray);font-size:10px}
-    .record-actions .danger{border-color:#f6b7b7;color:var(--red)}
-    .footer{position:fixed;z-index:50;bottom:0;left:50%;transform:translateX(-50%);width:min(480px,100%);padding:5px max(5px,env(safe-area-inset-right)) max(5px,env(safe-area-inset-bottom)) max(5px,env(safe-area-inset-left));border-top:1px solid var(--line);background:#fff;box-shadow:0 -2px 10px rgba(0,0,0,.06)}
-    .footer-row{display:flex;align-items:center;gap:8px}
-    .footer-row+ .footer-row{margin-top:4px}
-    .selected,.pass,.clear,.times,.plan{height:38px;border:1px solid var(--line);border-radius:5px;background:#fff;text-align:center;color:var(--ink)}
-    .selected{position:relative;flex:0 0 62px;padding-left:7px}
-    .selected em{position:absolute;top:-8px;left:-5px;min-width:28px;height:28px;padding:0 4px;border-radius:14px;background:var(--red);color:#fff;font-size:11px;font-style:normal;line-height:28px}
-    .pass{flex:1;color:var(--gray);font-size:12px}
-    .clear{flex:0 0 65px;background:var(--bg);color:var(--gray);font-size:12px}
-    .times-wrap{position:relative;flex:0 0 62px}
-    .times{width:100%;color:var(--red)}
-    .money{flex:1;color:var(--muted);font-size:10px;line-height:17px}
-    .money b{color:var(--red);font-size:13px}
-    .plan{flex:0 0 86px;border-color:var(--red);background:var(--red);color:#fff;font-weight:600}
-    .plan:disabled{border-color:#ccc;background:#ccc;cursor:not-allowed}
-    .pass-pop{position:absolute;right:5px;bottom:88px;left:5px;z-index:70;display:flex;gap:5px;padding:7px;border-radius:6px;background:#e9e9e9;box-shadow:0 2px 12px rgba(0,0,0,.15)}
-    .pass-pop button{flex:1;padding:8px 0;border:1px solid #d9d9d9;border-radius:5px;background:#fff;color:var(--gray)}
-    .pass-pop button.active{border-color:var(--red);background:var(--red);color:#fff}
-    .pass-pop button:disabled{background:#f0f0f0;color:#bbb}
-    .keyboard{position:absolute;bottom:42px;left:0;width:210px;border:1px solid var(--line);border-radius:6px;background:var(--bg);box-shadow:0 0 14px rgba(0,0,0,.16);overflow:hidden}
+    .g-header{position:fixed;z-index:9999;top:0;left:0;width:100%}
+    .m-header{position:relative;width:100vw;height:.88rem;padding:0 .3rem;overflow:hidden;background:#ff4145 url("assets/calculator/bg_header.png") no-repeat center;background-size:100% 100%;color:#fff;font-size:.34rem;line-height:.88rem;text-align:center}
+    .m-header-title{font-weight:400}
+    .header-action{position:absolute;top:0;height:.88rem;display:flex;align-items:center;justify-content:center}
+    .header-back{left:.3rem;width:.4rem;justify-content:flex-start}
+    .header-back img{width:.18rem;height:.33rem}
+    .header-more{right:.3rem;width:.4rem}
+    .header-more img{width:.4rem;height:.4rem}
+    .more-mask{position:fixed;z-index:9998;inset:0;padding-top:.88rem;background:rgba(0,0,0,.5)}
+    .more-nav{padding:0 .3rem .42rem;background:#fff;border-radius:.1rem .1rem 0 0;color:#333;font-size:.28rem}
+    .more-row{display:flex;min-height:.72rem;align-items:center;border-bottom:1px solid #eee}
+    .more-row:last-child{border-bottom:0}
+    .more-label{width:1.6rem;color:#f95b57}
+    .more-links{display:flex;flex:1;flex-wrap:wrap;gap:.18rem .48rem}
+    .more-links button,.more-links a{padding:.12rem 0}
+    .g-cont{min-height:100vh;padding-top:.88rem;padding-bottom:150px}
+    #headerTr{position:relative;z-index:98;background:#fff;border-bottom:1px solid var(--line);color:#333;font-size:14px}
+    #calculator_menu{display:flex;width:auto;height:50px;margin:2% 3%;gap:1%}
+    .calc-tab{display:flex;width:19%;height:46px;flex:0 0 19%;align-items:center;justify-content:center;border:1px solid #b5b5b5;border-radius:5px;background:#fff;color:#666;font-size:15px;line-height:18px;text-align:center;white-space:nowrap}
+    .calc-tab.combined{width:23%;flex-basis:23%;flex-direction:column;font-size:13px;line-height:17px}
+    .calc-tab.score{width:16%;flex-basis:16%}
+    .calc-tab:last-child{margin-left:auto}
+    .calc-tab.active{border:2px solid var(--red);color:var(--red);font-weight:300}
+    .loading{padding:1rem .3rem;color:#999;font-size:.3rem;text-align:center}
+    .data-empty{text-align:center}
+    .tip-img{padding:1rem 0;text-align:center}
+    .tip-img img{display:block;width:3rem;height:2rem;margin:0 auto .3rem}
+    .tip-img p{color:#666;font-size:.34rem;line-height:3}
+    .date-group{height:30px;padding:0 10px;background:#f6f6f6;border-bottom:1px solid var(--line);color:#666;font-size:12px;font-weight:400;line-height:30px}
+    .match-card{display:grid;grid-template-columns:72px minmax(0,1fr);background:#fff;border-bottom:1px solid var(--line);color:#666}
+    .match-meta{display:flex;min-height:96px;padding:8px 4px;align-items:center;justify-content:center;flex-direction:column;border-right:1px solid var(--line);font-size:11px;line-height:18px;text-align:center}
+    .match-meta .league{max-width:64px;overflow:hidden;color:#499bf4;text-overflow:ellipsis;white-space:nowrap}
+    .match-main{min-width:0;padding:7px 6px 9px}
+    .teams{display:grid;grid-template-columns:1fr 26px 1fr;align-items:center;margin-bottom:6px;color:#333;font-size:13px;text-align:center}
+    .teams span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .teams i{color:#999;font-size:10px;font-style:normal}
+    .market-row{display:grid;grid-template-columns:42px repeat(3,minmax(0,1fr));min-height:42px}
+    .market-row+.market-row{margin-top:4px}
+    .market-name{display:flex;align-items:center;justify-content:center;border:1px solid #dedede;border-right:0;border-radius:4px 0 0 4px;background:#f6f6f6;color:#888;font-size:10px;line-height:14px;text-align:center}
+    .market-name.positive{color:#f84a4a}.market-name.negative{color:#499bf4}
+    .odd{min-width:0;border:1px solid #dedede;border-left:0;background:#fff;color:#666;font-size:11px;line-height:15px;text-align:center}
+    .odd:last-child{border-radius:0 4px 4px 0}
+    .odd b{display:block;color:#555;font-size:13px;font-weight:400}
+    .odd.active{border-color:var(--red);background:var(--red);color:#fff}
+    .odd.active b{color:#fff}
+    .odd:disabled{background:#fafafa;color:#ccc;cursor:default}.odd:disabled b{color:#ccc}
+    .option-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid #dedede;border-left:1px solid #dedede;border-radius:4px;overflow:hidden}
+    .option-grid.score-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+    .option-grid.bqc-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .option-grid .odd{min-height:45px;border:0;border-right:1px solid #dedede;border-bottom:1px solid #dedede;border-radius:0}
+    .market-title{margin:5px 0 3px;color:#999;font-size:10px}
+    .load-error{padding:.25rem .3rem;color:#999;font-size:12px;text-align:center}
+    #sel_pan{position:fixed;z-index:100;bottom:0;left:0;width:100%;padding:5px 5px max(10px,env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#fff;color:#666;font-size:14px}
+    .footer-row{display:flex;width:100%;height:40px}
+    .footer-row+.footer-row{margin-top:5px}
+    .control{height:40px;border:1px solid var(--line);border-radius:5px;background:#fff;line-height:38px;text-align:center}
+    .sel-selected{position:relative;width:22%;padding-left:4%}
+    #selCount{position:absolute;top:-10px;left:-3px;min-width:30px;height:30px;padding:0 4px;border-radius:15px;background:var(--red);color:#fff;font-size:14px;line-height:30px}
+    .sel-guan{width:57%;margin:0 1%}
+    .sel-clean{display:flex;width:20%;align-items:center;justify-content:center;gap:10px;background:#f6f6f6;color:#666;font-size:12px}
+    .sel-clean img{width:10px;height:12px}
+    .sel-nums{width:22%;color:var(--red)}
+    .sel-money{display:flex;width:54%;padding-left:3%;justify-content:center;flex-direction:column;color:#999;font-size:11px;line-height:16px}
+    .sel-money b{color:var(--red);font-size:14px}
+    .plan{width:24%;border-color:var(--red);background:var(--red);color:#fff}
+    .plan:disabled{border-color:#ccc;background:#ccc}
+    .float-panel{position:fixed;z-index:110;right:5px;bottom:111px;left:5px;padding:7px;border:1px solid var(--line);border-radius:5px;background:#f4f4f4;box-shadow:0 0 12px rgba(0,0,0,.18)}
+    .pass-panel{display:flex;gap:5px}.pass-panel button{height:38px;flex:1;border:1px solid #ddd;border-radius:4px;background:#fff;color:#999}.pass-panel button.active{border-color:var(--red);background:var(--red);color:#fff}
+    .keyboard{right:auto;width:210px;padding:0;overflow:hidden;background:#fff}
     .kb-head{height:30px;background:var(--red);color:#fff;font-size:15px;font-weight:700;line-height:30px;text-align:center}
     .kb-grid{display:grid;grid-template-columns:repeat(3,1fr)}
-    .kb-grid button{height:42px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff;color:var(--ink);font-size:17px}
-    .kb-grid button:nth-child(3n){border-right:0}
-    .kb-grid .word{font-size:12px}
-    .modal-mask{position:fixed;inset:0;z-index:100;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45)}
-    .modal{width:min(480px,100%);max-height:82dvh;display:flex;flex-direction:column;border-radius:12px 12px 0 0;background:#fff;animation:up .2s ease}
-    @keyframes up{from{transform:translateY(30px);opacity:.7}}
-    .modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line);font-size:16px;font-weight:600}
-    .modal-close,.leg-remove{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--bg);color:var(--red);font-size:17px}
-    .modal-body{overflow:auto;padding:12px 16px}
-    .summary{padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:12px}.summary b{color:var(--red)}
-    .leg{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0;font-size:12px}
-    .leg small{display:block;margin-top:3px;color:var(--muted)}
-    .calc{margin-top:8px;padding:12px 7px;border-radius:6px;background:var(--bg);color:var(--gray);font-size:12px;text-align:center}.calc b{color:var(--red);font-size:14px}
-    .modal-foot{display:flex;gap:10px;padding:12px 16px max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line)}
-    .modal-foot button{flex:1;padding:10px 0;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--gray);font-size:14px}
-    .modal-foot .submit{border-color:var(--red);background:var(--red);color:#fff;font-weight:600}
-    .modal-foot .submit:disabled{border-color:#ccc;background:#ccc}
-    .toast{position:fixed;z-index:150;top:58px;left:50%;transform:translateX(-50%);width:min(430px,calc(100% - 24px));padding:9px 12px;border-radius:5px;background:rgba(30,30,30,.9);color:#fff;font-size:12px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.18)}
-    @media(max-width:390px){.topbar{padding:0 5px}.nav a{padding:8px 4px;font-size:12px}.topbar h1{font-size:16px}.tabs-wrap{padding-left:7px;padding-right:7px}.tab{font-size:12px}.record{grid-template-columns:1fr}.record-result{text-align:left}.record-actions{justify-content:flex-start}}
+    .kb-grid button{height:42px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff;font-size:17px}.kb-grid button:nth-child(3n){border-right:0}.kb-grid .word{font-size:12px}
+    .modal-mask{position:fixed;z-index:10000;inset:0;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45)}
+    .modal{width:100%;max-height:calc(100vh - 111px);display:flex;flex-direction:column;background:#fff}
+    .modal-head{display:flex;height:44px;padding:0 15px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);font-size:16px}
+    .modal-close,.leg-remove{width:28px;height:28px;border-radius:50%;background:#f6f6f6;color:var(--red);font-size:18px}
+    .modal-body{overflow:auto;padding:8px 15px}.summary{padding:8px 0;border-bottom:1px solid #eee;font-size:12px}.summary b,.calc b{color:var(--red)}
+    .leg{display:flex;padding:10px 0;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #eee;font-size:12px}.leg small{display:block;margin-top:3px;color:#999}
+    .calc{margin-top:8px;padding:10px;background:#f6f6f6;color:#666;font-size:12px;text-align:center}
+    .modal-foot{display:flex;gap:10px;padding:10px 15px max(10px,env(safe-area-inset-bottom));border-top:1px solid var(--line)}.modal-foot button{height:40px;flex:1;border:1px solid var(--line);border-radius:5px;background:#fff}.modal-foot .submit{border-color:var(--red);background:var(--red);color:#fff}
+    .toast{position:fixed;z-index:11000;top:1.08rem;left:50%;width:calc(100% - 24px);padding:9px 12px;transform:translateX(-50%);border-radius:5px;background:rgba(30,30,30,.9);color:#fff;font-size:12px;text-align:center}
+    @media(max-width:320px){.calc-tab{font-size:12px}.calc-tab.combined{font-size:12px}.match-card{grid-template-columns:62px minmax(0,1fr)}.match-meta{font-size:10px}.market-row{grid-template-columns:37px repeat(3,minmax(0,1fr))}}
+    @media(min-width:750px){html{font-size:100px!important}body{width:750px;margin:auto}.g-header,#sel_pan,.more-mask{left:50%;width:750px;transform:translateX(-50%)}.m-header{width:750px}.float-panel{right:calc((100% - 750px)/2 + 5px);left:calc((100% - 750px)/2 + 5px)}.modal{width:750px}}
   </style>
 </head>
 <body>
-  <div class="app">
-    <header class="topbar">
-      <nav class="nav"><a href="/">首页</a></nav>
-      <h1>竞彩模拟计算器</h1>
-      <nav class="nav right"><a href="/account.html">账户</a><a class="hidden" id="adminLink" href="/admin.html">管理</a></nav>
-    </header>
-    <div class="loading" id="loading">正在验证账号并载入赛事…</div>
-    <main class="main hidden" id="main">
-      <div class="userline"><span id="userEmail">--</span><span>固定每注 2 元 · 最多 4 场</span></div>
-      <section class="tabs-wrap">
-        <div class="tabs" id="tabs"></div>
-        <div class="search-row"><input class="search" id="search" type="search" placeholder="搜索球队 / 联赛 / 场次 / 日期" autocomplete="off"><button class="refresh" id="refreshMatches" type="button">刷新</button></div>
-      </section>
-      <div class="status" id="matchStatus">赛事载入中…</div>
-      <div class="table-scroll"><table class="match-table" id="matchTable"></table></div>
-      <section class="records">
-        <div class="records-head"><h2>我的下注记录</h2><button id="refreshBets" type="button">刷新记录</button></div>
-        <div class="record-list" id="betList"><div class="empty">记录载入中…</div></div>
-      </section>
-    </main>
+  <header class="g-header">
+    <div class="m-header">
+      <button class="header-action header-back" id="backBtn" type="button" aria-label="返回"><img src="assets/calculator/icon_back.png" alt=""></button>
+      <span class="m-header-title">足球计算器</span>
+      <button class="header-action header-more" id="moreBtn" type="button" aria-label="更多"><img src="assets/calculator/icon_more1.png" alt=""></button>
+    </div>
+  </header>
+  <div class="more-mask hidden" id="moreMask">
+    <nav class="more-nav">
+      <div class="more-row"><span class="more-label">常用功能</span><span class="more-links"><a href="/">赛事首页</a><a href="/account.html#records">下注记录</a><button id="refreshMatches" type="button">刷新赛事</button></span></div>
+      <div class="more-row"><span class="more-label">我的</span><span class="more-links"><a href="/account.html">账户中心</a><a class="hidden" id="adminLink" href="/admin.html">管理后台</a></span></div>
+    </nav>
   </div>
 
-  <footer class="footer hidden" id="footer">
+  <main class="g-cont" id="main">
+    <div id="headerTr"><div id="calculator_menu"></div></div>
+    <section id="matchList"><div class="loading">正在验证账号并载入赛事…</div></section>
+  </main>
+
+  <footer id="sel_pan" class="hidden">
     <div class="footer-row">
-      <button class="selected" id="selectedBtn" type="button"><em id="selectedCount">0</em>已选</button>
-      <button class="pass" id="passBtn" type="button">过关选择</button>
-      <button class="clear" id="clearBtn" type="button">清 空</button>
+      <button class="control sel-selected" id="selectedBtn" type="button"><em id="selCount">0</em>已选</button>
+      <button class="control sel-guan" id="passBtn" type="button">过关选择</button>
+      <button class="control sel-clean" id="clearBtn" type="button"><img src="assets/calculator/clean.png" alt=""><span>清&nbsp;空</span></button>
     </div>
     <div class="footer-row">
-      <div class="times-wrap">
-        <button class="times" id="timesBtn" type="button"><span id="timesValue">1</span>倍</button>
-        <div class="keyboard hidden" id="keyboard"><div class="kb-head"><span id="keyboardValue">1</span>倍</div><div class="kb-grid" id="keyboardGrid"></div></div>
-      </div>
-      <div class="money"><div>投注金额：<b id="stakeValue">0.00</b> 元</div><div>理论最高奖金：<b id="bonusValue">0.00</b> 元</div></div>
-      <button class="plan" id="planBtn" type="button" disabled>查看方案</button>
+      <button class="control sel-nums" id="timesBtn" type="button"><span id="timesValue">1</span>倍</button>
+      <div class="sel-money"><div>投注金额：<b id="stakeValue">0</b> 元</div><div>理论最高奖金：<b id="bonusValue">0.00</b> 元</div></div>
+      <button class="control plan" id="planBtn" type="button" disabled>查看方案</button>
     </div>
-    <div class="pass-pop hidden" id="passPop"></div>
   </footer>
+  <div class="float-panel pass-panel hidden" id="passPop"></div>
+  <div class="float-panel keyboard hidden" id="keyboard"><div class="kb-head"><span id="keyboardValue">1</span>倍</div><div class="kb-grid" id="keyboardGrid"></div></div>
 
   <div class="modal-mask hidden" id="planModal">
     <section class="modal" role="dialog" aria-modal="true" aria-labelledby="planTitle">
@@ -162,187 +143,75 @@
 
   <script>
     "use strict";
-    const PLAY_TABS=[
-      {type:"spf",label:"胜平负"},{type:"rqspf",label:"让球胜平负"},{type:"bf",label:"比分"},{type:"zjq",label:"总进球"},{type:"bqc",label:"半全场"}
+    const VIEWS=[
+      {type:"combined",label:'<span>胜平负</span><span>让球胜平负</span>',className:"combined"},
+      {type:"bf",label:"比 分",className:"score"},{type:"zjq",label:"总进球数"},{type:"bqc",label:"半全场"},{type:"mixed",label:"混合过关"}
     ];
-    const PLAY_LABEL=Object.fromEntries(PLAY_TABS.map(x=>[x.type,x.label]));
-    // 后端只接受数字比分；不展示“胜其他/平其他/负其他”等文本选项。
+    const PLAY_LABEL={spf:"胜平负",rqspf:"让球胜平负",bf:"比分",zjq:"总进球数",bqc:"半全场"};
     const SELECTIONS={
-      spf:[["home","主胜"],["draw","平"],["away","客胜"]],
-      rqspf:[["home","让胜"],["draw","让平"],["away","让负"]],
+      spf:[["home","胜"],["draw","平"],["away","负"]],rqspf:[["home","让胜"],["draw","让平"],["away","让负"]],
       bf:[["0-0","0:0"],["1-0","1:0"],["2-0","2:0"],["3-0","3:0"],["4-0","4:0"],["5-0","5:0"],["0-1","0:1"],["1-1","1:1"],["2-1","2:1"],["3-1","3:1"],["4-1","4:1"],["5-1","5:1"],["0-2","0:2"],["1-2","1:2"],["2-2","2:2"],["3-2","3:2"],["4-2","4:2"],["5-2","5:2"],["0-3","0:3"],["1-3","1:3"],["2-3","2:3"],["3-3","3:3"],["4-3","4:3"],["0-4","0:4"],["1-4","1:4"],["2-4","2:4"],["3-4","3:4"],["4-4","4:4"],["0-5","0:5"],["1-5","1:5"],["2-5","2:5"]],
       zjq:[["0","0球"],["1","1球"],["2","2球"],["3","3球"],["4","4球"],["5","5球"],["6","6球"],["7","7+球"]],
       bqc:[["home/home","胜胜"],["home/draw","胜平"],["home/away","胜负"],["draw/home","平胜"],["draw/draw","平平"],["draw/away","平负"],["away/home","负胜"],["away/draw","负平"],["away/away","负负"]]
     };
+    const VIEW_PLAYS={combined:["spf","rqspf"],bf:["bf"],zjq:["zjq"],bqc:["bqc"],mixed:["spf","rqspf","bf","zjq","bqc"]};
     const PASS={1:["single","单关"],2:["2x1","2串1"],3:["3x1","3串1"],4:["4x1","4串1"]};
-    const state={token:localStorage.getItem("football_ai_session")||"",adminToken:localStorage.getItem("football_ai_admin_session")||"",csrf:"",user:null,matches:[],bets:[],play:"spf",query:"",cart:[],oddsCache:new Map(),times:1,renderVersion:0,editingBetId:null,prefill:null};
+    const state={token:localStorage.getItem("football_ai_session")||"",adminToken:localStorage.getItem("football_ai_admin_session")||"",csrf:"",user:null,matches:[],view:"combined",cart:[],oddsCache:new Map(),times:1,renderVersion:0,editingBetId:null,prefill:null,loadError:""};
     const $=id=>document.getElementById(id);
     const esc=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
     const selectionLabel=(type,value)=>(SELECTIONS[type]||[]).find(x=>x[0]===value)?.[1]||value;
     const fmtOdds=value=>Number.isFinite(Number(value))?(Number.isInteger(Number(value))?String(Number(value)):Number(value).toFixed(2)):"—";
     const currentNext=location.pathname+location.search;
-
     function redirectLogin(){location.replace(`/login.html?next=${encodeURIComponent(currentNext)}`)}
     function showToast(message,delay=2800){const el=$("toast");el.textContent=message;el.classList.remove("hidden");clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>el.classList.add("hidden"),delay)}
-    function setStatus(message,error=false){$("matchStatus").textContent=message;$("matchStatus").classList.toggle("error",error)}
     function authToken(){return state.token||state.adminToken}
     async function loadCsrf(){const response=await fetch(`/api/auth/csrf?__session=${Date.now()}`,{credentials:"same-origin",cache:"no-store"});if(!response.ok)throw new Error("CSRF token 获取失败");state.csrf=(await response.json()).csrf_token||"";if(!state.csrf)throw new Error("CSRF token 获取失败")}
-    async function api(path,options={}){
-      const method=String(options.method||"GET").toUpperCase();
-      const headers={...(options.headers||{})};
-      if(options.body!==undefined)headers["Content-Type"]="application/json";
-      if(["POST","PUT","PATCH","DELETE"].includes(method))headers["X-CSRF-Token"]=state.csrf;
-      if(authToken())headers.Authorization=`Bearer ${authToken()}`;
-      const response=await fetch(`/api${path}`,{...options,method,headers,credentials:"same-origin",cache:"no-store"});
-      const payload=await response.json().catch(()=>({}));
-      if(!response.ok){const error=new Error(payload.detail||`请求失败（HTTP ${response.status}）`);error.status=response.status;throw error}
-      return payload;
-    }
+    async function api(path,options={}){const method=String(options.method||"GET").toUpperCase(),headers={...(options.headers||{})};if(options.body!==undefined)headers["Content-Type"]="application/json";if(["POST","PUT","PATCH","DELETE"].includes(method))headers["X-CSRF-Token"]=state.csrf;if(authToken())headers.Authorization=`Bearer ${authToken()}`;const response=await fetch(`/api${path}`,{...options,method,headers,credentials:"same-origin",cache:"no-store"}),payload=await response.json().catch(()=>({}));if(!response.ok){const error=new Error(payload.detail||`请求失败（HTTP ${response.status}）`);error.status=response.status;throw error}return payload}
     function handleAuthError(error){if(error&&[401,403].includes(error.status)){localStorage.removeItem("football_ai_session");localStorage.removeItem("football_ai_admin_session");redirectLogin();return true}return false}
+    function parsePrefill(){const p=new URLSearchParams(location.search),matchId=p.get("match_id"),play=p.get("play_type"),selection=p.get("selection");if(!matchId&&!play&&!selection)return null;return{matchId:String(matchId||""),play:SELECTIONS[play]?play:"spf",selection:String(selection||"")}}
+    function viewForPlay(play){return play==="spf"||play==="rqspf"?"combined":play}
 
-    function parsePrefill(){
-      const p=new URLSearchParams(location.search),matchId=p.get("match_id"),play=p.get("play_type"),selection=p.get("selection");
-      if(!matchId&&!play&&!selection)return null;
-      return {matchId:String(matchId||""),play:SELECTIONS[play]?play:"spf",selection:String(selection||"")};
-    }
-    async function init(){
-      state.prefill=parsePrefill();
-      try{
-        if(!authToken()){redirectLogin();return}
-        await loadCsrf();
-        state.user=await api(`/auth/me?__session=${Date.now()}`);
-        $("userEmail").textContent=state.user.email||"已登录";
-        $("adminLink").classList.toggle("hidden",!state.user.is_admin);
-        bind();renderTabs();renderKeyboard();
-        await loadMatches();
-        if(!state.user.is_active){location.replace("/account.html");return}
-        $("loading").classList.add("hidden");$("main").classList.remove("hidden");$("footer").classList.remove("hidden");
-        await renderMatches();
-        if(state.prefill)await applyPrefill();
-        await loadBets();
-      }catch(error){if(handleAuthError(error))return;$("loading").textContent=error.message;showToast(error.message,5000)}
-    }
+    async function init(){state.prefill=parsePrefill();bind();renderTabs();renderKeyboard();renderFooter();try{if(!authToken()){redirectLogin();return}await loadCsrf();state.user=await api(`/auth/me?__session=${Date.now()}`);if(!state.user.is_active){location.replace("/account.html");return}$("adminLink").classList.toggle("hidden",!state.user.is_admin);$("sel_pan").classList.remove("hidden");await loadMatches();await renderMatches();if(state.prefill)await applyPrefill()}catch(error){if(handleAuthError(error))return;state.loadError=error.message;renderEmpty(true);showToast(error.message,5000)}}
     function bind(){
-      $("tabs").addEventListener("click",event=>{const tab=event.target.closest("[data-play]");if(!tab||tab.dataset.play===state.play)return;state.play=tab.dataset.play;state.renderVersion++;renderTabs();renderMatches()});
-      $("search").addEventListener("input",event=>{state.query=event.target.value.trim().toLowerCase();state.renderVersion++;renderMatches()});
-      $("refreshMatches").onclick=async()=>{state.oddsCache.clear();await loadMatches();await renderMatches()};
-      $("matchTable").addEventListener("click",event=>{const button=event.target.closest("[data-pick]");if(button&&!button.disabled)selectPick(button)});
-      $("refreshBets").onclick=loadBets;
-      $("betList").addEventListener("click",event=>{const button=event.target.closest("[data-edit],[data-delete]");if(!button)return;const id=Number(button.dataset.edit||button.dataset.delete);button.dataset.edit?editBet(id):deleteBet(id)});
+      $("backBtn").onclick=()=>{if(history.length>1)history.back();else location.href="/"};
+      $("moreBtn").onclick=()=>$("moreMask").classList.toggle("hidden");
+      $("moreMask").onclick=event=>{if(event.target===$("moreMask"))$("moreMask").classList.add("hidden")};
+      $("refreshMatches").onclick=async()=>{$("moreMask").classList.add("hidden");state.oddsCache.clear();try{await loadMatches();await renderMatches();showToast("赛事已刷新")}catch(error){if(handleAuthError(error))return;renderEmpty(true);showToast(error.message,5000)}};
+      $("calculator_menu").addEventListener("click",event=>{const tab=event.target.closest("[data-view]");if(!tab||tab.dataset.view===state.view)return;state.view=tab.dataset.view;renderTabs();renderMatches()});
+      $("matchList").addEventListener("click",event=>{const button=event.target.closest("[data-pick]");if(button&&!button.disabled)selectPick(button)});
       $("selectedBtn").onclick=openPlan;$("planBtn").onclick=openPlan;$("clearBtn").onclick=clearCart;
       $("passBtn").onclick=()=>{$("passPop").classList.toggle("hidden");$("keyboard").classList.add("hidden")};
-      $("passPop").addEventListener("click",event=>{if(event.target.closest("button:not(:disabled)"))$("passPop").classList.add("hidden")});
+      $("passPop").onclick=()=>$("passPop").classList.add("hidden");
       $("timesBtn").onclick=()=>{$("keyboard").classList.toggle("hidden");$("passPop").classList.add("hidden");$("keyboard").dataset.fresh="1"};
       $("keyboardGrid").addEventListener("click",keyboardClick);
       $("planModal").addEventListener("click",event=>{if(event.target===$("planModal")||event.target.closest("[data-close-modal]"))closePlan();const remove=event.target.closest("[data-remove]");if(remove){state.cart.splice(Number(remove.dataset.remove),1);renderFooter();renderMatches();renderPlan()}});
       $("submitBtn").onclick=submitCart;
-      document.addEventListener("keydown",event=>{if(event.key==="Escape"){closePlan();$("keyboard").classList.add("hidden");$("passPop").classList.add("hidden")}});
+      document.addEventListener("keydown",event=>{if(event.key==="Escape"){closePlan();$("keyboard").classList.add("hidden");$("passPop").classList.add("hidden");$("moreMask").classList.add("hidden")}})
     }
-
-    async function loadMatches(){
-      setStatus("正在从服务器载入赛事…");
-      try{const payload=await api("/data/matches");if(!Array.isArray(payload.matches))throw new Error("服务器赛事数据格式无效");state.matches=payload.matches;setStatus(`共 ${state.matches.length} 场服务器赛事 · 赔率按玩法实时载入`)}
-      catch(error){if(handleAuthError(error))return;state.matches=[];setStatus(error.message,true);throw error}
-    }
-    function filteredMatches(){const q=state.query;return state.matches.filter(match=>!q||[match.home,match.away,match.league,match.round,match.date,match.id].some(v=>String(v||"").toLowerCase().includes(q)))}
-    function renderTabs(){$("tabs").innerHTML=PLAY_TABS.map(item=>`<button class="tab${state.play===item.type?" active":""}" data-play="${item.type}" type="button">${esc(item.label)}</button>`).join("")}
+    function renderTabs(){$("calculator_menu").innerHTML=VIEWS.map(item=>`<button class="calc-tab ${item.className||""}${state.view===item.type?" active":""}" data-view="${item.type}" type="button">${item.label}</button>`).join("")}
+    async function loadMatches(){try{const payload=await api("/data/matches");if(!Array.isArray(payload.matches))throw new Error("服务器赛事数据格式无效");state.matches=payload.matches;state.loadError=""}catch(error){if(handleAuthError(error))return;state.matches=[];state.loadError=error.message;throw error}}
     function cacheKey(matchId,play){return `${matchId}:${play}`}
     function getOdds(matchId,play){return state.oddsCache.get(cacheKey(matchId,play))?.odds||null}
-    async function ensureOdds(match,play){
-      const key=cacheKey(match.id,play),existing=state.oddsCache.get(key);if(existing)return existing.promise||existing;
-      const entry={odds:null,loading:true,promise:null};state.oddsCache.set(key,entry);
-      entry.promise=api(`/data/matches/${encodeURIComponent(match.id)}/odds?play_type=${encodeURIComponent(play)}`).then(payload=>{
-        const raw=payload&&payload.odds&&typeof payload.odds==="object"?payload.odds:null;
-        entry.odds=raw?Object.fromEntries(Object.entries(raw).map(([k,v])=>[String(k),Number(v)]).filter(([,v])=>Number.isFinite(v))):null;entry.loading=false;entry.promise=null;return entry;
-      }).catch(error=>{entry.loading=false;entry.promise=null;entry.error=error.message;return entry});
-      return entry.promise;
-    }
-    async function renderMatches(){
-      const version=++state.renderVersion,play=state.play,query=state.query,matches=filteredMatches();
-      renderTable(matches,play,true);
-      if(matches.length)await Promise.all(matches.map(match=>ensureOdds(match,play)));
-      // 玩法、搜索词或其他渲染已经变化时，旧异步响应不得覆盖新界面。
-      if(version!==state.renderVersion||play!==state.play||query!==state.query)return;
-      renderTable(matches,play,false);
-    }
-    function renderTable(matches,play,loading){
-      const options=SELECTIONS[play]||[],table=$("matchTable");
-      table.className=`match-table${options.length>12?" wide":options.length>5?" medium":""}`;
-      const head=`<thead><tr><th class="info-head">赛事</th>${options.map(x=>`<th>${esc(x[1])}</th>`).join("")}</tr></thead>`;
-      if(!matches.length){table.innerHTML=head+`<tbody><tr><td colspan="${options.length+1}"><div class="empty">没有匹配的服务器赛事。</div></td></tr></tbody>`;return}
-      let lastDate="",body="";
-      for(const match of matches){
-        const day=String(match.date||"").slice(0,10);if(day&&day!==lastDate){body+=`<tr class="date-row"><td colspan="${options.length+1}">${esc(day)}</td></tr>`;lastDate=day}
-        const odds=getOdds(String(match.id),play),entry=state.oddsCache.get(cacheKey(match.id,play));
-        const handicap=play==="rqspf"&&match.handicap!==null&&match.handicap!==undefined?`<span class="handicap">让${Number(match.handicap)>0?"+":""}${esc(match.handicap)}</span>`:"";
-        const info=`<td class="info"><div class="league">${esc(match.league||"未知联赛")} ${esc(match.round||"")} ${handicap}</div><div class="teams">${esc(match.home||"主队")} <span class="time">VS</span> ${esc(match.away||"客队")}</div><div class="time">${esc(String(match.date||"").slice(11,16)||"--")}</div></td>`;
-        const cells=options.map(([value,label])=>{const odd=odds?.[value],valid=Number.isFinite(Number(odd))&&Number(odd)>1,active=state.cart.some(leg=>leg.matchId===String(match.id)&&leg.play===play&&leg.selection===value);return `<td><button class="odds${active?" active":""}" data-pick data-match="${esc(match.id)}" data-play="${play}" data-selection="${esc(value)}" type="button" ${valid?"":"disabled"}><span class="odds-label">${esc(label)}</span><span class="odds-value">${valid?fmtOdds(odd):(loading||entry?.loading?"…":"—")}</span></button></td>`}).join("");
-        body+=`<tr class="match-row">${info}${cells}</tr>`;
-      }
-      table.innerHTML=head+`<tbody>${body}</tbody>`;
-    }
-    function selectPick(button){
-      const match=state.matches.find(x=>String(x.id)===button.dataset.match);if(!match)return;
-      const play=button.dataset.play,selection=button.dataset.selection,odd=Number(getOdds(String(match.id),play)?.[selection]);if(!(odd>1))return;
-      const sameMatch=state.cart.findIndex(x=>x.matchId===String(match.id));
-      if(sameMatch>=0){const old=state.cart[sameMatch];if(old.play===play&&old.selection===selection)state.cart.splice(sameMatch,1);else state.cart[sameMatch]={...old,play,selection,odds:odd,label:selectionLabel(play,selection),handicap:play==="rqspf"?match.handicap:null}}
-      else{if(state.cart.length>=4){showToast("最多选择 4 场不同赛事进行串关。");return}state.cart.push({matchId:String(match.id),matchName:`${match.home||"主队"} vs ${match.away||"客队"}`,play,selection,odds:odd,label:selectionLabel(play,selection),handicap:play==="rqspf"?match.handicap:null})}
-      renderFooter();renderMatches();
-    }
-    function passInfo(){return PASS[state.cart.length]||null}
-    function totalOdds(){return state.cart.reduce((n,leg)=>n*Number(leg.odds),1)}
-    function renderFooter(){
-      const count=state.cart.length,pass=passInfo(),stake=count?2*state.times:0,bonus=count?totalOdds()*stake:0;
-      $("selectedCount").textContent=count;$("passBtn").textContent=pass?`过关：${pass[1]}`:"过关选择";$("timesValue").textContent=state.times;$("keyboardValue").textContent=state.times;$("stakeValue").textContent=stake.toFixed(2);$("bonusValue").textContent=bonus.toFixed(2);$("planBtn").disabled=!count;
-      $("passPop").innerHTML=Object.entries(PASS).map(([n,p])=>`<button type="button" ${count===Number(n)?'class="active"':""} ${count===Number(n)?"":"disabled"}>${p[1]}</button>`).join("");
-    }
+    async function ensureOdds(match,play){const key=cacheKey(match.id,play),existing=state.oddsCache.get(key);if(existing)return existing.promise||existing;const entry={odds:null,loading:true,promise:null};state.oddsCache.set(key,entry);entry.promise=api(`/data/matches/${encodeURIComponent(match.id)}/odds?play_type=${encodeURIComponent(play)}`).then(payload=>{const raw=payload&&payload.odds&&typeof payload.odds==="object"?payload.odds:null;entry.odds=raw?Object.fromEntries(Object.entries(raw).map(([k,v])=>[String(k),Number(v)]).filter(([,v])=>Number.isFinite(v))):null;entry.loading=false;entry.promise=null;return entry}).catch(error=>{entry.loading=false;entry.promise=null;entry.error=error.message;return entry});return entry.promise}
+    async function renderMatches(){const version=++state.renderVersion,view=state.view,plays=VIEW_PLAYS[view],matches=state.matches;renderMatchCards(matches,view,true);if(matches.length)await Promise.all(matches.flatMap(match=>plays.map(play=>ensureOdds(match,play))));if(version!==state.renderVersion||view!==state.view)return;renderMatchCards(matches,view,false)}
+    function renderEmpty(failed=false){$("matchList").innerHTML=`<div class="data-empty"><div class="tip-img"><img src="assets/calculator/bg_tip.png" alt=""><p>${failed?"赛事载入失败，请稍后重试。":"当前暂无相关比赛，敬请期待。"}</p></div>${failed?`<div class="load-error">${esc(state.loadError)}</div>`:""}</div>`}
+    function validOdd(matchId,play,value){const odd=getOdds(String(matchId),play)?.[value];return Number.isFinite(Number(odd))&&Number(odd)>1?Number(odd):null}
+    function oddButton(match,play,value,label,loading){const odd=validOdd(match.id,play,value),entry=state.oddsCache.get(cacheKey(match.id,play)),active=state.cart.some(leg=>leg.matchId===String(match.id)&&leg.play===play&&leg.selection===value);return `<button class="odd${active?" active":""}" data-pick data-match="${esc(match.id)}" data-play="${play}" data-selection="${esc(value)}" type="button" ${odd?"":"disabled"}><span>${esc(label)}</span><b>${odd?fmtOdds(odd):(loading||entry?.loading?"…":"—")}</b></button>`}
+    function compactMarket(match,play,loading){const handicap=Number(match.handicap),name=play==="spf"?"0":`${Number.isFinite(handicap)&&handicap>0?"+":""}${Number.isFinite(handicap)?handicap:"让球"}`,tone=play==="rqspf"?(handicap>0?" positive":" negative"):"";return `<div class="market-row"><div class="market-name${tone}">${esc(name)}</div>${SELECTIONS[play].map(([value,label])=>oddButton(match,play,value,label,loading)).join("")}</div>`}
+    function optionMarket(match,play,loading){const cls=play==="bf"?" score-grid":play==="bqc"?" bqc-grid":"";return `<div class="market-title">${esc(PLAY_LABEL[play])}</div><div class="option-grid${cls}">${SELECTIONS[play].map(([value,label])=>oddButton(match,play,value,label,loading)).join("")}</div>`}
+    function marketHtml(match,view,loading){if(view==="combined")return compactMarket(match,"spf",loading)+compactMarket(match,"rqspf",loading);if(view==="mixed")return compactMarket(match,"spf",loading)+compactMarket(match,"rqspf",loading)+optionMarket(match,"bf",loading)+optionMarket(match,"zjq",loading)+optionMarket(match,"bqc",loading);return optionMarket(match,view,loading)}
+    function renderMatchCards(matches,view,loading){if(!matches.length){renderEmpty(Boolean(state.loadError));return}let html="",lastDate="";for(const match of matches){const date=String(match.date||"").slice(0,10);if(date&&date!==lastDate){html+=`<div class="date-group">${esc(date)}</div>`;lastDate=date}const time=String(match.date||"").slice(11,16)||"--:--";html+=`<article class="match-card"><div class="match-meta"><span class="league">${esc(match.league||"未知联赛")}</span><span>${esc(match.round||match.id||"")}</span><span>${esc(time)} 截止</span></div><div class="match-main"><div class="teams"><span>${esc(match.home||"主队")}</span><i>VS</i><span>${esc(match.away||"客队")}</span></div>${marketHtml(match,view,loading)}</div></article>`}$("matchList").innerHTML=html}
+    function selectPick(button){const match=state.matches.find(x=>String(x.id)===button.dataset.match);if(!match)return;const play=button.dataset.play,selection=button.dataset.selection,odd=validOdd(match.id,play,selection);if(!odd)return;const same=state.cart.findIndex(x=>x.matchId===String(match.id));if(same>=0){const old=state.cart[same];if(old.play===play&&old.selection===selection)state.cart.splice(same,1);else state.cart[same]={...old,play,selection,odds:odd,label:selectionLabel(play,selection),handicap:play==="rqspf"?match.handicap:null}}else{if(state.cart.length>=4){showToast("最多选择 4 场不同赛事进行串关。");return}state.cart.push({matchId:String(match.id),matchName:`${match.home||"主队"} vs ${match.away||"客队"}`,play,selection,odds:odd,label:selectionLabel(play,selection),handicap:play==="rqspf"?match.handicap:null})}renderFooter();renderMatches()}
+    function passInfo(){return PASS[state.cart.length]||null}function totalOdds(){return state.cart.reduce((n,leg)=>n*Number(leg.odds),1)}
+    function renderFooter(){const count=state.cart.length,pass=passInfo(),stake=count?2*state.times:0,bonus=count?totalOdds()*stake:0;$("selCount").textContent=count;$("passBtn").textContent=pass?`过关：${pass[1]}`:"过关选择";$("timesValue").textContent=state.times;$("keyboardValue").textContent=state.times;$("stakeValue").textContent=stake?stake.toFixed(2):"0";$("bonusValue").textContent=bonus.toFixed(2);$("planBtn").disabled=!count;$("passPop").innerHTML=Object.entries(PASS).map(([n,p])=>`<button type="button" ${count===Number(n)?'class="active"':"disabled"}>${p[1]}</button>`).join("")}
     function clearCart(){state.cart=[];state.editingBetId=null;renderFooter();renderMatches();closePlan();showToast("已清空所选方案。")}
-    function renderKeyboard(){const keys=["1","2","3","4","5","6","7","8","9","del","0","ok"];
-      $("keyboardGrid").innerHTML=keys.map(k=>`<button type="button" data-key="${k}" class="${/[a-z]/.test(k)?"word":""}">${k==="del"?"删除":k==="ok"?"确认":k}</button>`).join("")}
+    function renderKeyboard(){const keys=["1","2","3","4","5","6","7","8","9","del","0","ok"];$("keyboardGrid").innerHTML=keys.map(k=>`<button type="button" data-key="${k}" class="${/[a-z]/.test(k)?"word":""}">${k==="del"?"删除":k==="ok"?"确认":k}</button>`).join("")}
     function keyboardClick(event){const button=event.target.closest("[data-key]");if(!button)return;const key=button.dataset.key,fresh=$("keyboard").dataset.fresh==="1";let value=state.times;if(key==="del"){value=fresh?1:Math.max(1,Math.floor(value/10));$("keyboard").dataset.fresh="0"}else if(key==="ok"){$("keyboard").classList.add("hidden");$("keyboard").dataset.fresh="1"}else{value=Math.min(99999,Math.max(1,Number(`${fresh?"":value}${key}`)));$("keyboard").dataset.fresh="0"}state.times=value;renderFooter();if(!$("planModal").classList.contains("hidden"))renderPlan()}
-    function openPlan(){if(!state.cart.length)return;renderPlan();$("planModal").classList.remove("hidden")}
-    function closePlan(){$("planModal").classList.add("hidden")}
-    function renderPlan(){
-      if(!state.cart.length){closePlan();return}const pass=passInfo(),stake=2*state.times;
-      const legs=state.cart.map((leg,index)=>{const handi=leg.handicap===null||leg.handicap===undefined?"":` · 让${Number(leg.handicap)>0?"+":""}${leg.handicap}`;return `<div class="leg"><div><b>${esc(leg.matchName)}</b><small>${esc(PLAY_LABEL[leg.play]||leg.play)} · ${esc(leg.label)}${handi} @ ${fmtOdds(leg.odds)}</small></div><button class="leg-remove" data-remove="${index}" type="button" aria-label="移除">×</button></div>`}).join("");
-      $("planBody").innerHTML=`<div class="summary">过关方式：<b>${pass?.[1]||"--"}</b> · 倍数：<b>${state.times}倍</b> · 每注：<b>2.00元</b></div>${legs}<div class="calc">总赔率 <b>${fmtOdds(totalOdds())}</b> · 总投入 <b>${stake.toFixed(2)}元</b> · 理论最高奖金 <b>${(totalOdds()*stake).toFixed(2)}元</b></div>`;
-      $("submitBtn").disabled=!pass;
-    }
-
-    async function submitCart(){
-      const pass=passInfo();if(!pass)return;const legs=state.cart.map(leg=>({match_id:leg.matchId,play_type:leg.play,selection:leg.selection,handicap:leg.play==="rqspf"?leg.handicap:null,odds:leg.odds}));
-      if(legs.some(leg=>!(leg.odds>1))){showToast("方案中存在无效赔率，请刷新赛事后重选。");return}
-      $("submitBtn").disabled=true;$("submitBtn").textContent="提交中…";
-      try{const first=legs[0],payload={match_id:first.match_id,play_type:first.play_type,selection:first.selection,handicap:first.handicap,odds:first.odds,pass_type:pass[0],stake:2*state.times,legs};if(state.editingBetId&&legs.length===1){await api(`/bets/${state.editingBetId}`,{method:"PATCH",body:JSON.stringify({play_type:first.play_type,selection:first.selection,handicap:first.handicap,odds:first.odds,stake:payload.stake})})}else{await api("/bets",{method:"POST",body:JSON.stringify(payload)})}state.cart=[];state.editingBetId=null;closePlan();renderFooter();renderMatches();showToast("记录已保存，赛果更新后将自动结算。");await loadBets()}
-      catch(error){if(!handleAuthError(error))showToast(error.message,5000)}finally{$("submitBtn").disabled=false;$("submitBtn").textContent="确认提交"}
-    }
-    async function loadBets(){
-      try{const payload=await api("/bets");state.bets=Array.isArray(payload.items)?payload.items:[];renderBets()}
-      catch(error){if(!handleAuthError(error)){$("betList").innerHTML=`<div class="empty">${esc(error.message)}</div>`;showToast(error.message)}}
-    }
-    function recordLegText(leg,bet){const play=leg.play_type||bet.play_type,sel=selectionLabel(play,leg.selection),handi=play==="rqspf"&&leg.handicap!==null&&leg.handicap!==undefined?` · 让${Number(leg.handicap)>0?"+":""}${leg.handicap}`:"";return `${PLAY_LABEL[play]||play} · ${sel}${handi} @${leg.odds}`}
-    function renderBets(){
-      const status={pending:"待结算",won:"已命中",lost:"未命中"};
-      if(!state.bets.length){$("betList").innerHTML='<div class="empty">还没有下注记录。</div>';return}
-      $("betList").innerHTML=state.bets.map(bet=>{const legs=Array.isArray(bet.legs)&&bet.legs.length?bet.legs:null,actions=bet.status==="pending"?(legs?`<div class="record-actions"><button class="danger" data-delete="${bet.id}" type="button">删除</button></div>`:`<div class="record-actions"><button data-edit="${bet.id}" type="button">修改</button><button class="danger" data-delete="${bet.id}" type="button">删除</button></div>`):"";let title,detail;if(legs){title=`${esc(PASS[legs.length]?.[1]||bet.pass_type||"")} · 共 ${legs.length} 场`;detail=legs.map(leg=>`<span>${esc(leg.match_name||leg.match_id||"")} · ${esc(recordLegText(leg,bet))}</span>`).join("")+`<span>投注金额 ${esc(bet.stake)}</span>`}else{title=esc(bet.match_name||bet.match_id);detail=`${esc(recordLegText(bet,bet))} · 投注金额 ${esc(bet.stake)}`}return `<article class="record"><div><b>${title}</b><small>${detail}</small></div><div class="record-result ${bet.status||""}">${esc(status[bet.status]||bet.status)}<small>${bet.profit===null||bet.profit===undefined?"--":Number(bet.profit).toFixed(2)}</small>${actions}</div></article>`}).join("");
-    }
-    async function editBet(id){
-      const bet=state.bets.find(x=>Number(x.id)===id);if(!bet||bet.status!=="pending"||(Array.isArray(bet.legs)&&bet.legs.length))return;
-      // 修改单关时保留原记录，确认方案后通过 PATCH 原子更新，放弃编辑不会丢单。
-      try{
-        const match=state.matches.find(x=>String(x.id)===String(bet.match_id));if(!match){showToast("该赛事已不在当前服务器赛事中，无法修改。");return}
-        await ensureOdds(match,bet.play_type);const odd=Number(getOdds(String(match.id),bet.play_type)?.[bet.selection]);if(!(odd>1)){showToast("当前服务器已无该选项赔率，无法修改。");return}
-        state.editingBetId=id;state.play=bet.play_type;state.times=Math.max(1,Math.round(Number(bet.stake)/2)||1);state.cart=[{matchId:String(match.id),matchName:`${match.home||"主队"} vs ${match.away||"客队"}`,play:bet.play_type,selection:bet.selection,odds:odd,label:selectionLabel(bet.play_type,bet.selection),handicap:bet.play_type==="rqspf"?match.handicap:null}];renderTabs();renderFooter();await renderMatches();window.scrollTo({top:0,behavior:"smooth"});showToast("已按当前服务器赔率载入；确认方案后更新原记录。",4500)
-      }catch(error){if(!handleAuthError(error))showToast(error.message,5000)}
-    }
-    async function deleteBet(id){const bet=state.bets.find(x=>Number(x.id)===id);if(!bet||bet.status!=="pending")return;const name=bet.match_name||(Array.isArray(bet.legs)&&bet.legs.length?`${bet.legs.length}场串关`:bet.match_id);if(!confirm(`确定删除「${name}」的下注记录吗？`))return;try{await api(`/bets/${id}`,{method:"DELETE"});showToast("下注记录已删除。");await loadBets()}catch(error){if(!handleAuthError(error))showToast(error.message,5000)}}
-    async function applyPrefill(){
-      const prefill=state.prefill;state.prefill=null;if(!prefill)return;const match=state.matches.find(x=>String(x.id)===prefill.matchId);if(!match){showToast("URL 指定的赛事不在当前服务器赛事中。",4500);return}
-      state.play=prefill.play;renderTabs();await renderMatches();if(!(SELECTIONS[prefill.play]||[]).some(x=>x[0]===prefill.selection)){showToast("URL 指定的玩法选项无效。",4500);return}
-      const odd=Number(getOdds(String(match.id),prefill.play)?.[prefill.selection]);if(!(odd>1)){showToast("当前服务器没有该玩法选项的有效赔率。",4500);return}
-      state.cart=[{matchId:String(match.id),matchName:`${match.home||"主队"} vs ${match.away||"客队"}`,play:prefill.play,selection:prefill.selection,odds:odd,label:selectionLabel(prefill.play,prefill.selection),handicap:prefill.play==="rqspf"?match.handicap:null}];renderFooter();await renderMatches();showToast("已按当前服务器赛事与赔率预填。")
-    }
-    renderFooter();init();
+    function openPlan(){if(!state.cart.length)return;renderPlan();$("planModal").classList.remove("hidden")}function closePlan(){$("planModal").classList.add("hidden")}
+    function renderPlan(){if(!state.cart.length){closePlan();return}const pass=passInfo(),stake=2*state.times,legs=state.cart.map((leg,index)=>{const handi=leg.handicap===null||leg.handicap===undefined?"":` · 让${Number(leg.handicap)>0?"+":""}${leg.handicap}`;return `<div class="leg"><div><b>${esc(leg.matchName)}</b><small>${esc(PLAY_LABEL[leg.play]||leg.play)} · ${esc(leg.label)}${handi} @ ${fmtOdds(leg.odds)}</small></div><button class="leg-remove" data-remove="${index}" type="button" aria-label="移除">×</button></div>`}).join("");$("planBody").innerHTML=`<div class="summary">过关方式：<b>${pass?.[1]||"--"}</b> · 倍数：<b>${state.times}倍</b> · 每注：<b>2.00元</b></div>${legs}<div class="calc">总赔率 <b>${fmtOdds(totalOdds())}</b> · 总投入 <b>${stake.toFixed(2)}元</b> · 理论最高奖金 <b>${(totalOdds()*stake).toFixed(2)}元</b></div>`;$("submitBtn").disabled=!pass}
+    async function submitCart(){const pass=passInfo();if(!pass)return;const legs=state.cart.map(leg=>({match_id:leg.matchId,play_type:leg.play,selection:leg.selection,handicap:leg.play==="rqspf"?leg.handicap:null,odds:leg.odds}));if(legs.some(leg=>!(leg.odds>1))){showToast("方案中存在无效赔率，请刷新赛事后重选。");return}$("submitBtn").disabled=true;$("submitBtn").textContent="提交中…";try{const first=legs[0],payload={match_id:first.match_id,play_type:first.play_type,selection:first.selection,handicap:first.handicap,odds:first.odds,pass_type:pass[0],stake:2*state.times,legs};if(state.editingBetId&&legs.length===1)await api(`/bets/${state.editingBetId}`,{method:"PATCH",body:JSON.stringify({play_type:first.play_type,selection:first.selection,handicap:first.handicap,odds:first.odds,stake:payload.stake})});else await api("/bets",{method:"POST",body:JSON.stringify(payload)});state.cart=[];state.editingBetId=null;closePlan();renderFooter();renderMatches();showToast("记录已保存，赛果更新后将自动结算。")}catch(error){if(!handleAuthError(error))showToast(error.message,5000)}finally{$("submitBtn").disabled=false;$("submitBtn").textContent="确认提交"}}
+    async function applyPrefill(){const prefill=state.prefill;state.prefill=null;if(!prefill)return;const match=state.matches.find(x=>String(x.id)===prefill.matchId);if(!match){showToast("URL 指定的赛事不在当前服务器赛事中。",4500);return}state.view=viewForPlay(prefill.play);renderTabs();await ensureOdds(match,prefill.play);await renderMatches();if(!(SELECTIONS[prefill.play]||[]).some(x=>x[0]===prefill.selection)){showToast("URL 指定的玩法选项无效。",4500);return}const odd=validOdd(match.id,prefill.play,prefill.selection);if(!odd){showToast("当前服务器没有该玩法选项的有效赔率。",4500);return}state.cart=[{matchId:String(match.id),matchName:`${match.home||"主队"} vs ${match.away||"客队"}`,play:prefill.play,selection:prefill.selection,odds:odd,label:selectionLabel(prefill.play,prefill.selection),handicap:prefill.play==="rqspf"?match.handicap:null}];renderFooter();await renderMatches();showToast("已按当前服务器赛事与赔率预填。")}
+    init();
   </script>
 </body>
 </html>

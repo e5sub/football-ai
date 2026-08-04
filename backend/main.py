@@ -1276,3 +1276,4 @@ def service_worker() -> FileResponse:
 
 
 app.mount("/data", StaticFiles(directory=str(ROOT / "data")), name="data")
+app.mount("/assets", StaticFiles(directory=str(ROOT / "assets")), name="assets")
