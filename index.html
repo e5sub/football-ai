@@ -685,7 +685,7 @@
             </table>
             <div class="analysis-track">
               <div class="track-head">
-                <h4>研判版本与临场锁定</h4>
+                <h4>研判版本与临场锁定 <small id="trackVersionCount" style="color:var(--text-secondary);font-weight:normal"></small></h4>
                 <span class="track-status" id="trackingStatus">等待快照</span>
               </div>
               <div class="track-grid">
@@ -1315,6 +1315,7 @@
     }
 
     function renderAnalysisTracking(match) {
+      window.__currentMatch = match;
       const tracking = match.analysisTracking || {};
       const change = tracking.change || {};
       const initial = tracking.initial || {};
@@ -1353,19 +1354,34 @@
       $("trackReason").textContent = change.reason || "尚未形成赔率变化记录。";
 
       const stageLabels = {initial: "初始", latest: "更新", review: "候选复核", changed: "改判", locked: "锁定", "post-lock": "锁定后记录"};
-      const snapshots = Array.isArray(tracking.snapshots) ? tracking.snapshots.slice(-6).reverse() : [];
-      $("trackTimeline").innerHTML = snapshots.length ? snapshots.map(item => {
+      const allSnapshots = Array.isArray(tracking.snapshots) ? tracking.snapshots : [];
+      const totalVersions = allSnapshots.length;
+      const defaultShow = 6;
+      const showAll = $("trackTimeline").dataset.expanded === "true";
+      const displaySnapshots = showAll ? allSnapshots.slice().reverse() : allSnapshots.slice(-defaultShow).reverse();
+      const hasMore = totalVersions > defaultShow && !showAll;
+      $("trackTimeline").innerHTML = totalVersions ? displaySnapshots.map(item => {
         const candidateText = item.candidatePrimary && item.candidatePrimary !== item.primary
           ? ` · 候选${escapeHtml(item.candidatePrimary)}未通过`
+          : "";
+        const routineTag = item.stage === "latest" && !item.meaningful
+          ? ` · <span style="color:var(--text-secondary)">例行复核</span>`
           : "";
         return `
           <div class="track-row">
             <time>${escapeHtml(formatDateTime(item.at))}</time>
-            <b>${escapeHtml(stageLabels[item.stage] || "快照")} · ${escapeHtml(item.primary || "--")}${candidateText}</b>
+            <b>${escapeHtml(stageLabels[item.stage] || "快照")} · ${escapeHtml(item.primary || "--")}${candidateText}${routineTag}</b>
             <em>${escapeHtml(formatOddsSnapshot(item.odds))}</em>
           </div>
         `;
-      }).join("") : `<div class="intel-meta">首次自动更新后开始保存研判快照。</div>`;
+      }).join("")
+        + (hasMore ? `<div class="track-row" style="cursor:pointer;color:var(--cyan)" onclick="document.getElementById('trackTimeline').dataset.expanded='true';renderAnalysisTracking(window.__currentMatch||{})">展开全部 ${totalVersions} 个版本 ▼</div>` : "")
+        + (showAll ? `<div class="track-row" style="cursor:pointer;color:var(--text-secondary)" onclick="document.getElementById('trackTimeline').dataset.expanded='';renderAnalysisTracking(window.__currentMatch||{})">收起</div>` : "")
+      : `<div class="intel-meta">首次自动更新后开始保存研判快照。</div>`;
+      const versionCountEl = $("trackVersionCount");
+      if (versionCountEl) {
+        versionCountEl.textContent = totalVersions ? `共 ${totalVersions} 个版本` : "";
+      }
     }
 
     function renderAgents(agents) {

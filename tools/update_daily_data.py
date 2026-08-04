@@ -60,16 +60,67 @@ LEAGUE_ALIASES = {
 }
 
 
+def load_previous_matches_payload(json_path: Path) -> tuple[dict[str, Any], str]:
+    """Load the authoritative previous matches payload.
+
+    The API serves database snapshots before JSON files, so building new
+    analysis tracking against the container's JSON would discard the live
+    version chain whenever Docker rebuilt the image. When DATABASE_URL is set,
+    prefer the database snapshot; fall back to the JSON file otherwise.
+    """
+    if os.getenv("DATABASE_URL"):
+        try:
+            payload = load_dataset_snapshot("matches")
+            if payload:
+                return payload, "database"
+        except Exception:  # noqa: BLE001
+            pass
+    return load_json(json_path, {}), "json"
+
+
+def load_previous_matches_list(json_path: Path, dataset_key: str) -> tuple[list[dict[str, Any]], str]:
+    """Load the authoritative previous history/archive match list."""
+    if os.getenv("DATABASE_URL"):
+        try:
+            payload = load_dataset_snapshot(dataset_key)
+            if isinstance(payload, dict) and isinstance(payload.get("matches"), list):
+                return payload["matches"], "database"
+        except Exception:  # noqa: BLE001
+            pass
+    return (load_json(json_path, {"matches": []}).get("matches") or []), "json"
+
+
+def load_dataset_snapshot(dataset_key: str) -> dict[str, Any] | None:
+    """Return a stored dataset payload from the database without importing app state."""
+    try:
+        from sqlalchemy import create_engine, text
+    except ImportError:
+        return None
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        return None
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            row = connection.execute(
+                text("SELECT payload FROM data_snapshots WHERE dataset_key = :key"),
+                {"key": dataset_key},
+            ).first()
+        return dict(row[0]) if row and row[0] else None
+    finally:
+        engine.dispose()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Update the GitHub Pages dashboard from 500.com.")
     parser.add_argument("--history-days", type=int, default=10, help="Recent result days to refresh.")
     parser.add_argument("--history-retention", type=int, default=400, help="Days kept for team and league profiles.")
     args = parser.parse_args()
 
-    old_payload = load_json(DATA_PATH, {})
+    old_payload, previous_source = load_previous_matches_payload(DATA_PATH)
     seed_profiles = normalize_seed_profiles(old_payload.get("seedLeagueProfiles") or old_payload.get("leagueProfiles") or [])
-    old_history = load_json(HISTORY_PATH, {"matches": []}).get("matches") or []
-    old_archive = load_json(ARCHIVE_PATH, {"matches": []}).get("matches") or []
+    old_history, _ = load_previous_matches_list(HISTORY_PATH, "history")
+    old_archive, _ = load_previous_matches_list(ARCHIVE_PATH, "analysis_archive")
     old_catalog = load_json(FIXTURE_CATALOG_PATH, {"matches": []})
     today = local_today()
 
@@ -133,7 +184,7 @@ def main() -> None:
         intelligence = collect_match_intelligence(current_rows, old_payload.get("matches") or [], warnings)
         matches = [build_match(row, profiles, team_profiles, intelligence.get(str(row.get("id")))) for row in current_rows]
         matches = balance_slate_decisions(current_rows, matches, profiles, team_profiles, intelligence)
-        matches = apply_analysis_tracking(old_payload.get("matches") or [], matches)
+        matches = apply_analysis_tracking(old_payload.get("matches") or [], matches, archive=old_archive)
         update_status = "success" if current_rows else "success-no-current-matches"
 
     try:
@@ -1863,17 +1914,98 @@ def apply_analysis_tracking(
     old_matches: list[dict[str, Any]],
     matches: list[dict[str, Any]],
     at: datetime | None = None,
+    archive: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     captured_at = at or datetime.now(ZoneInfo("Asia/Shanghai"))
     if captured_at.tzinfo is None:
         captured_at = captured_at.replace(tzinfo=ZoneInfo("Asia/Shanghai"))
     return [
-        track_match_analysis(find_previous_match(match, old_matches), match, captured_at)
+        track_match_analysis(
+            resolve_previous_match(match, old_matches, archive),
+            match,
+            captured_at,
+        )
         for match in matches
     ]
 
 
+def resolve_previous_match(
+    match: dict[str, Any],
+    old_matches: list[dict[str, Any]],
+    archive: list[dict[str, Any]] | None,
+) -> dict[str, Any] | None:
+    """Find the previous version of a match in current matches, then the archive.
+
+    A match that temporarily drops off the current slate and returns would
+    otherwise be reinitialized as "initial". The archive preserves the initial
+    snapshot and version chain so the timeline continues from where it left off.
+    """
+    previous = find_previous_match(match, old_matches)
+    if previous is not None or not archive:
+        return previous
+    archived = find_previous_match(match, archive)
+    if not archived:
+        return None
+    # Reconstruct the shape track_match_analysis expects from previous matches,
+    # restoring the tracking block the archive carries.
+    return {
+        "id": archived.get("id") or match.get("id"),
+        "fixtureId": archived.get("fixtureId") or match.get("fixtureId"),
+        "homeTeamId": archived.get("homeTeamId"),
+        "awayTeamId": archived.get("awayTeamId"),
+        "date": archived.get("date") or match.get("date"),
+        "round": archived.get("round") or match.get("round"),
+        "home": archived.get("home") or match.get("home"),
+        "away": archived.get("away") or match.get("away"),
+        "league": archived.get("league") or match.get("league"),
+        "odds": {
+            "initial": archived.get("oddsInitial") or {},
+            "current": archived.get("oddsLatest") or archived.get("oddsInitial") or {},
+        },
+        "analysisTracking": {
+            "status": archived.get("trackingStatus") or "legacy",
+            "firstSeenAt": (archived.get("initialAnalysis") or {}).get("at") or archived.get("createdAt") or "",
+            "updatedAt": archived.get("updatedAt") or "",
+            "initialOdds": archived.get("oddsInitial") or {},
+            "initial": archived.get("initialAnalysis"),
+            "latest": archived.get("latestAnalysis") or archived.get("initialAnalysis"),
+            "locked": bool(archived.get("lockedAnalysis")),
+            "lockedAt": (archived.get("lockedAnalysis") or {}).get("at") or "",
+            "lockedSnapshot": archived.get("lockedAnalysis"),
+            "snapshots": archived.get("analysisTimeline") or ([archived.get("initialAnalysis")] if archived.get("initialAnalysis") else []),
+        },
+    }
+
+
+def canonical_match_key(match: dict[str, Any]) -> str:
+    """Stable identity for the same fixture across rounds, time fixes and renames.
+
+    Prefer the source fixture id; fall back to team ids on the kickoff day; only
+    use normalized team names when the stable ids are missing. Relying on the
+    round name or exact kickoff string caused the version chain to reset whenever
+    the source corrected a kickoff time or team display name.
+    """
+    fixture_id = str(match.get("fixtureId") or match.get("fixture_id") or "").strip()
+    if fixture_id:
+        return f"f:{fixture_id}"
+    home_id = str(match.get("homeTeamId") or match.get("home_id") or "").strip()
+    away_id = str(match.get("awayTeamId") or match.get("away_id") or "").strip()
+    day = str(match.get("date") or "")[:10]
+    if home_id and away_id:
+        return f"t:{day}:{home_id}:{away_id}"
+    home = normalize_team(match.get("home"))
+    away = normalize_team(match.get("away"))
+    if home and away:
+        return f"n:{day}:{home}:{away}"
+    return ""
+
+
 def find_previous_match(match: dict[str, Any], old_matches: list[dict[str, Any]]) -> dict[str, Any] | None:
+    match_key = canonical_match_key(match)
+    if match_key:
+        for previous in old_matches:
+            if canonical_match_key(previous) == match_key:
+                return previous
     match_id = str(match.get("id") or "")
     fixture_id = str(match.get("fixtureId") or "")
     for previous in old_matches:
@@ -1881,12 +2013,16 @@ def find_previous_match(match: dict[str, Any], old_matches: list[dict[str, Any]]
             return previous
         if fixture_id and str(previous.get("fixtureId") or "") == fixture_id:
             return previous
+    match_day = str(match.get("date") or "")[:10]
+    match_home = normalize_team(match.get("home"))
+    match_away = normalize_team(match.get("away"))
     for previous in old_matches:
+        # Round is treated as a tie-breaker only: the source may renumber or
+        # reformat it while the fixture id, team ids and kickoff day match.
         if (
-            str(previous.get("date") or "")[:10] == str(match.get("date") or "")[:10]
-            and str(previous.get("round") or "") == str(match.get("round") or "")
-            and normalize_team(previous.get("home")) == normalize_team(match.get("home"))
-            and normalize_team(previous.get("away")) == normalize_team(match.get("away"))
+            str(previous.get("date") or "")[:10] == match_day
+            and normalize_team(previous.get("home")) == match_home
+            and normalize_team(previous.get("away")) == match_away
         ):
             return previous
     return None
@@ -2046,8 +2182,13 @@ def track_match_analysis(
             reason = f"最新赔率复核后仍维持{candidate_primary}，方向未发生改判。"
             status = "steady"
         latest = analysis_snapshot(match, captured_text, "latest", current_odds, True, reason, candidate_primary)
-        if snapshot_is_meaningful(snapshots[-1] if snapshots else None, latest):
-            snapshots = append_snapshot(snapshots, latest)
+
+    # Every successful refresh records a version, so the timeline accumulates
+    # "更新" rows even when odds barely moved. snapshot_is_meaningful becomes a
+    # marker on the snapshot (例行复核 vs 有效变盘) rather than the gate that
+    # decides whether a version exists.
+    latest["meaningful"] = snapshot_is_meaningful(snapshots[-1] if snapshots else None, latest)
+    snapshots = append_snapshot(snapshots, latest)
 
     locked_snapshot = None
     locked_at = ""
@@ -2372,27 +2513,39 @@ def update_analysis_archive(
     retention_days: int,
 ) -> list[dict[str, Any]]:
     archive = {str(item.get("id")): dict(item) for item in old_archive if item.get("id")}
+    archive_keys = {canonical_match_key(item) for item in archive.values() if canonical_match_key(item)}
     for match in matches:
         conclusion = match.get("conclusion") or {}
         odds = match.get("odds") or {}
         tracking = match.get("analysisTracking") or {}
         match_id = str(match.get("id"))
-        duplicate_id = next(
-            (
+        match_key = canonical_match_key(match)
+        # Prefer the stable canonical key to find an existing archive entry; this
+        # survives round renumbering, kickoff time fixes and team display renames.
+        duplicate_id = None
+        if match_key and match_key in archive_keys:
+            duplicate_id = next(
                 item_id for item_id, item in archive.items()
-                if str(item.get("date") or "")[:10] == str(match.get("date") or "")[:10]
-                and str(item.get("round") or "") == str(match.get("round") or "")
-                and normalize_team(item.get("home")) == normalize_team(match.get("home"))
-                and normalize_team(item.get("away")) == normalize_team(match.get("away"))
-            ),
-            None,
-        )
+                if canonical_match_key(item) == match_key
+            )
+        if not duplicate_id:
+            duplicate_id = next(
+                (
+                    item_id for item_id, item in archive.items()
+                    if str(item.get("date") or "")[:10] == str(match.get("date") or "")[:10]
+                    and normalize_team(item.get("home")) == normalize_team(match.get("home"))
+                    and normalize_team(item.get("away")) == normalize_team(match.get("away"))
+                ),
+                None,
+            )
         match_is_provisional = bool(re.fullmatch(r"500-周.\d{3}", match_id))
         duplicate_is_provisional = bool(duplicate_id and re.fullmatch(r"500-周.\d{3}", duplicate_id))
         archive_id = duplicate_id if duplicate_id and match_is_provisional and not duplicate_is_provisional else match_id
         previous = archive.get(archive_id) or (archive.get(duplicate_id) if duplicate_id else {}) or {}
         if duplicate_id and duplicate_id != archive_id:
             archive.pop(duplicate_id, None)
+        if match_key:
+            archive_keys.add(match_key)
         initial_analysis = copy.deepcopy(tracking.get("initial") or previous.get("initialAnalysis"))
         latest_analysis = copy.deepcopy(tracking.get("latest") or previous.get("latestAnalysis"))
         locked_analysis = copy.deepcopy(tracking.get("lockedSnapshot") or previous.get("lockedAnalysis"))
@@ -2400,6 +2553,11 @@ def update_analysis_archive(
         timeline = merge_analysis_timelines(previous.get("analysisTimeline"), tracking.get("snapshots"))
         archive[archive_id] = {
             "id": archive_id,
+            "canonicalMatchKey": match_key,
+            "fixtureId": match.get("fixtureId") or previous.get("fixtureId"),
+            "homeTeamId": match.get("homeTeamId") or previous.get("homeTeamId"),
+            "awayTeamId": match.get("awayTeamId") or previous.get("awayTeamId"),
+            "sourceType": match.get("sourceType") or previous.get("sourceType"),
             "date": match.get("date"),
             "round": match.get("round"),
             "league": match.get("league"),
