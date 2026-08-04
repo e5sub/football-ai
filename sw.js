@@ -1,15 +1,17 @@
 // Never cache API responses.  In particular, auth/me and csrf responses are
 // user/session specific; caching either makes a browser appear logged out after
 // a refresh and leaves POST requests carrying an expired CSRF token.
-const CACHE_NAME = "football-ai-command-center-v10";
+const CACHE_NAME = "football-ai-command-center-v11";
 const CORE_ASSETS = [
   "./",
   "./index.html",
+  "./calculator.html",
+  "./login.html",
+  "./account.html",
+  "./admin.html",
   "./data/matches.json",
   "./data/analysis_archive.json",
-  "./data/jc_history.json",
-  "./使用说明.txt",
-  "./免责声明.txt"
+  "./data/jc_history.json"
 ];
 
 self.addEventListener("install", event => {
@@ -35,7 +37,9 @@ self.addEventListener("fetch", event => {
   if (url.pathname.startsWith("/api/")) return;
 
   if (event.request.mode === "navigate") {
-    event.respondWith(networkFirst(event.request, "./index.html"));
+    const pageFallbacks = new Set(["/calculator.html", "/login.html", "/account.html", "/admin.html"]);
+    const fallbackPath = pageFallbacks.has(url.pathname) ? `.${url.pathname}` : "./index.html";
+    event.respondWith(networkFirst(event.request, fallbackPath));
     return;
   }
   if (url.pathname.endsWith(".json")) {

@@ -8,6 +8,7 @@ COPY tools /app/tools
 COPY index.html /app/index.html
 COPY login.html /app/login.html
 COPY account.html /app/account.html
+COPY calculator.html /app/calculator.html
 COPY admin.html /app/admin.html
 COPY sw.js /app/sw.js
 COPY data /app/data

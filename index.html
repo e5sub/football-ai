@@ -458,95 +458,9 @@
     }
     .manual-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .account-box { width: min(900px, 100%); }
-    .account-workbench { width: min(980px, 100%); max-height: calc(100dvh - 36px); display: flex; flex-direction: column; }
-    .account-workbench > .license-body { min-height: 0; overflow: auto; }
     .account-box > .license-body { padding: 0; gap: 0; }
     .account-box #authGuest { padding: 18px; }
     .account-box > .license-body > .message { margin: 0 18px 14px; }
-    .account-section { padding: 16px 18px; border-bottom: 1px solid var(--line2); }
-    .account-section:last-child { border-bottom: 0; }
-    .account-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
-    .account-section-head h3 { margin: 0; font-size: 14px; }
-    .account-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(340px,1.08fr); gap: 0; }
-    .account-records { min-height: 0; }
-    .account-records .history-list { max-height: 315px; overflow: auto; }
-    .account-records .history-row { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
-    .account-records .history-row small { white-space: nowrap; }
-    .history-actions { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
-    .history-action { height: 26px; padding: 0 8px; border: 1px solid var(--line); border-radius: 4px; background: rgba(255,255,255,.04); color: var(--text); font-size: 11px; }
-    .history-action.danger { border-color: rgba(255,99,125,.42); color: #ffb5c0; }
-    .account-record-form { border-left: 1px solid var(--line2); }
-    .account-record-form .manual-form { max-width: 430px; }
-    .account-workbench > header { position: relative; padding: 20px 72px 18px 24px; border-bottom: 1px solid var(--line2); }
-    .account-workbench > header h2 { font-size: 22px; }
-    .account-workbench #accountCloseBtn { position: absolute; top: 16px; right: 16px; }
-    .account-layout { min-height: 0; padding: 0; gap: 0; }
-    .account-main { min-width: 0; }
-    /* ---- sporttery 风格竞彩模拟计算器 ---- */
-    .calc-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 0; min-height: 0; }
-    .calc-main { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line2); }
-    .calc-toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line2); flex-wrap: wrap; }
-    .calc-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
-    .calc-tab { height: 30px; padding: 0 13px; border: 1px solid var(--line); border-radius: 99px; background: rgba(255,255,255,.04); color: var(--muted); font-size: 12px; font-weight: 600; transition: border-color .15s, color .15s, background .15s; }
-    .calc-tab:hover { border-color: var(--cyan); color: var(--text); }
-    .calc-tab.active { border-color: var(--cyan); background: rgba(50,213,255,.14); color: var(--cyan); }
-    .calc-search { min-width: 150px; max-width: 220px; margin-left: auto; }
-    .calc-list { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 10px 12px; display: grid; align-content: start; gap: 8px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
-    .calc-match { border: 1px solid var(--line2); border-radius: 9px; background: linear-gradient(135deg, rgba(255,255,255,.035), rgba(255,255,255,.01)); overflow: hidden; }
-    .calc-match-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 7px 11px; border-bottom: 1px solid var(--line2); color: var(--muted); font-size: 11px; }
-    .calc-match-head .calc-league { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .calc-match-head .calc-handi { color: var(--amber); font-weight: 700; }
-    .calc-match-teams { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 11px 4px; font-size: 13.5px; font-weight: 700; }
-    .calc-match-teams span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .calc-match-teams .calc-vs { color: var(--muted); font-size: 11px; font-weight: 600; flex: 0 0 auto; }
-    .calc-odds { display: grid; gap: 5px; padding: 6px 8px 9px; }
-    .calc-odds.three { grid-template-columns: repeat(3, minmax(0,1fr)); }
-    .calc-odds.grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
-    .calc-odds-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 7px 4px; border: 1px solid var(--line); border-radius: 6px; background: rgba(8,14,22,.6); color: var(--text); cursor: pointer; transition: border-color .15s, background .15s, color .15s, transform .08s; }
-    .calc-odds-btn:hover:not(:disabled) { border-color: var(--cyan); background: rgba(50,213,255,.09); }
-    .calc-odds-btn:active:not(:disabled) { transform: scale(.97); }
-    .calc-odds-btn.active { border-color: var(--cyan); background: rgba(50,213,255,.18); box-shadow: inset 0 0 0 1px rgba(50,213,255,.4); }
-    .calc-odds-btn.active .calc-odds-val { color: var(--cyan); }
-    .calc-odds-btn:disabled { cursor: not-allowed; opacity: .5; }
-    .calc-odds-lbl { font-size: 11px; color: var(--muted); line-height: 1.2; }
-    .calc-odds-btn.active .calc-odds-lbl { color: var(--text); }
-    .calc-odds-val { font-size: 15px; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; }
-    .calc-empty { padding: 30px 16px; text-align: center; color: var(--muted); font-size: 13px; }
-    /* 投注单 */
-    .calc-slip { display: flex; flex-direction: column; min-height: 0; background: rgba(10,16,24,.55); }
-    .calc-slip-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 16px 10px; border-bottom: 1px solid var(--line2); }
-    .calc-slip-head h3 { margin: 0; font-size: 15px; }
-    .calc-slip-head .calc-count { color: var(--muted); font-size: 12px; }
-    .calc-clear { height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 5px; background: rgba(255,255,255,.04); color: var(--muted); font-size: 11px; }
-    .calc-clear:hover { border-color: var(--red); color: #ffb5c0; }
-    .calc-legs { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px 12px; display: grid; align-content: start; gap: 6px; }
-    .calc-leg { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line2); border-radius: 7px; background: rgba(255,255,255,.03); }
-    .calc-leg b { display: block; font-size: 12.5px; overflow-wrap: anywhere; }
-    .calc-leg small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
-    .calc-leg small .calc-leg-odds { color: var(--cyan); font-weight: 700; }
-    .calc-leg-rm { width: 24px; height: 24px; flex: 0 0 24px; border: 1px solid var(--line); border-radius: 5px; background: rgba(255,255,255,.04); color: var(--muted); font-size: 15px; line-height: 1; }
-    .calc-leg-rm:hover { border-color: var(--red); color: #ffb5c0; }
-    .calc-slip-empty { padding: 26px 16px; text-align: center; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
-    .calc-slip-foot { padding: 12px 16px 16px; border-top: 1px solid var(--line2); display: grid; gap: 10px; }
-    .calc-pass { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; }
-    .calc-pass .calc-pass-tag { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border: 1px solid rgba(51,230,166,.4); border-radius: 99px; color: var(--green); font-weight: 700; font-size: 12px; }
-    .calc-pass .calc-pass-tag.muted { border-color: var(--line); color: var(--muted); }
-    .calc-amounts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .calc-field { display: grid; gap: 4px; }
-    .calc-field span { color: var(--muted); font-size: 11px; }
-    .calc-odds-line { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--muted); }
-    .calc-odds-line b { color: var(--text); font-variant-numeric: tabular-nums; }
-    .calc-payout { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 9px 0 1px; }
-    .calc-payout span { color: var(--muted); font-size: 12px; }
-    .calc-payout b { color: var(--green); font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
-    .calc-submit { width: 100%; height: 42px; }
-    @media (max-width: 760px) {
-      .calc-body { grid-template-columns: 1fr; }
-      .calc-main { border-right: 0; border-bottom: 1px solid var(--line2); }
-      .calc-list { max-height: 46vh; }
-      .calc-slip { position: static; }
-      .calc-search { max-width: none; margin-left: 0; flex: 1; }
-    }
     body.history-open { overflow: hidden; }
     .history-layer { overflow: hidden; overscroll-behavior: contain; }
     .history-box { width: min(980px, 100%); height: min(820px, calc(100dvh - 36px)); max-height: calc(100dvh - 36px); display: flex; flex-direction: column; min-height: 0; }
@@ -614,9 +528,6 @@
       .match-title { padding-right: 124px; font-size: 28px; }
       .brand p { max-width: min(280px, calc(100vw - 96px)); line-height: 1.35; word-break: break-word; }
       .panel-head { flex-wrap: wrap; }
-      .account-section-head { align-items: flex-start; flex-direction: column; }
-      .account-grid { grid-template-columns: 1fr; }
-      .account-record-form { border-left: 0; border-top: 1px solid var(--line2); }
       .panel-sub, .final-text, .report-card p, .league-line, .match-meta { word-break: break-all; }
     }
   </style>
@@ -633,6 +544,7 @@
       </div>
       <div class="badges">
         <button class="badge badge-button" id="historyBtn" type="button"><span class="icon">↺</span>历史回看</button>
+        <button class="badge badge-button" id="calculatorBtn" type="button"><span class="icon">＋</span>竞彩计算器</button>
         <button class="badge badge-button" id="accountBtn" type="button"><span class="icon">◎</span><span id="accountText">登录 / 注册</span></button>
         <button class="badge badge-button" id="adminBtn" type="button"><span class="icon">⚙</span><span id="adminBtnText">管理员登录</span></button>
         <span class="badge" id="updateBadge" title="数据更新时间：检查中"><span class="dot" id="updateDot"></span><span id="updateText">500数据检查中</span></span>
@@ -876,37 +788,6 @@
       </div>
     </section>
   </div>
-  <div class="license-layer hidden" id="accountLayer">
-    <section class="license-box account-workbench">
-      <header>
-        <div>
-          <h2>竞彩模拟计算器</h2>
-          <p>点击赛事赔率加入投注单，支持单关与 2–4 场串关；赛果同步后自动结算。仅用于体育研究记录，不涉及真实下注。</p>
-        </div>
-        <button class="icon-btn" id="accountCloseBtn" type="button" aria-label="关闭计算器" title="关闭">×</button>
-      </header>
-      <div class="license-body account-layout">
-        <div class="calc-body">
-          <div class="calc-main">
-            <div class="calc-toolbar">
-              <div class="calc-tabs" id="calcTabs"></div>
-              <input class="input calc-search" id="calcSearch" type="search" placeholder="搜索球队 / 联赛" autocomplete="off">
-            </div>
-            <div class="calc-list" id="calcList"></div>
-          </div>
-          <aside class="calc-slip" id="calcSlip"></aside>
-        </div>
-        <section class="account-section account-records">
-          <div class="account-section-head">
-            <div><h3>我的下注记录</h3><p class="panel-sub">最近保存的计划与结算结果</p></div>
-            <button class="btn" id="refreshBetsBtn" type="button">刷新</button>
-          </div>
-          <div class="history-list" id="betList"></div>
-          <div class="panel-sub" id="betMessage" style="margin-top:10px"></div>
-        </section>
-      </div>
-    </section>
-  </div>
   <script>
     const PRODUCT_NAME = "AI足球赛事预测系统";
     const MANUAL_STORAGE_KEY = "football_ai_manual_matches_v1";
@@ -963,7 +844,7 @@
     const DATA_CACHE_KEY = "football_ai_remote_data_cache_v3";
     const ARCHIVE_CACHE_KEY = "football_ai_archive_cache_v2";
     const LIVE_REFRESH_INTERVAL = 60 * 1000;
-    const state = { data: FALLBACK_DATA, matches: [], manualMatches: [], fixtureCatalog: null, catalogPromise: null, activeId: "", archive: [], archiveLoaded: false, bets: [], authToken: localStorage.getItem("football_ai_session") || "", user: null, adminToken: localStorage.getItem("football_ai_admin_session") || "", csrfToken: "", calcPlayType: "spf", betCart: [], calcOddsCache: {}, calcQuery: "", calcUnit: 2, calcTimes: 1 };
+    const state = { data: FALLBACK_DATA, matches: [], manualMatches: [], fixtureCatalog: null, catalogPromise: null, activeId: "", archive: [], archiveLoaded: false, authToken: localStorage.getItem("football_ai_session") || "", user: null, adminToken: localStorage.getItem("football_ai_admin_session") || "", csrfToken: "" };
 
     const $ = (id) => document.getElementById(id);
     const pct = (value) => `${Math.round((Number(value) || 0) * 1000) / 10}%`;
@@ -979,16 +860,9 @@
       $("analyzeAllBtn").addEventListener("click", renderPortfolio);
       $("historyBtn").addEventListener("click", openHistoryLayer);
       $("historyCloseBtn").addEventListener("click", closeHistoryLayer);
+      $("calculatorBtn").addEventListener("click", openCalculator);
       $("accountBtn").addEventListener("click", openAccountLayer);
       $("recordBetBtn").addEventListener("click", openBetRecorder);
-      $("accountCloseBtn").addEventListener("click", closeAccountLayer);
-      $("refreshBetsBtn").addEventListener("click", () => loadBetRecords().catch(e => setBetMessage(e.message)));
-      $("betList").addEventListener("click", handleBetRecordAction);
-      $("calcTabs").addEventListener("click", handleCalcTabClick);
-      $("calcSearch").addEventListener("input", (event) => { state.calcQuery = event.target.value.trim().toLowerCase(); renderCalcMatches(); });
-      $("calcList").addEventListener("click", handleCalcListClick);
-      $("calcSlip").addEventListener("click", handleCalcSlipClick);
-      $("calcSlip").addEventListener("input", handleCalcSlipInput);
       $("adminBtn").addEventListener("click", openAdminLayer);
       $("historySearch").addEventListener("input", renderHistory);
       $("historyHitFilter").addEventListener("change", renderHistory);
@@ -1089,15 +963,9 @@
       location.href = "/account.html";
     }
 
-    function closeAccountLayer() {
-      $("accountLayer").classList.add("hidden");
-      document.body.classList.remove("history-open");
-    }
-
     function updateAccountBadge() {
       $("accountText").textContent = state.user ? state.user.email : "登录 / 注册";
       updateAdminVisibility();
-      if (state.user) loadBetRecords().catch(e => setBetMessage(e.message));
     }
 
     function updateAdminVisibility() {
@@ -1106,397 +974,26 @@
       $("adminBtnText").textContent = state.adminToken || state.user?.is_admin ? "管理后台" : "管理员登录";
     }
 
-    async function loadBetRecords() {
-      try {
-        const records = await apiRequest("/bets");
-        state.bets = records.items;
-        $("betList").innerHTML = records.items.length ? records.items.map(renderBetRecord).join("") : '<div class="panel-sub">还没有下注记录。</div>';
-      } catch (error) { setBetMessage(error.message); }
+    function openCalculator() {
+      const url = "/calculator.html";
+      const popup = window.open(url, "_blank");
+      if (popup) return;
+      location.href = url;
     }
 
-    // 标签 / 选项常量：玩法标签 + 各玩法的选项（值、中文标签）。
-    const CALC_PLAY_TABS = [
-      {type: "spf", label: "胜平负"},
-      {type: "rqspf", label: "让球胜平负"},
-      {type: "bf", label: "比分"},
-      {type: "zjq", label: "总进球"},
-      {type: "bqc", label: "半全场"},
-    ];
-    const CALC_PLAY_LABEL = {spf: "胜平负", rqspf: "让球胜平负", bf: "比分", zjq: "总进球", bqc: "半全场"};
-    const CALC_SELECTIONS = {
-      spf: [["home", "主胜"], ["draw", "平"], ["away", "客胜"]],
-      rqspf: [["home", "让胜"], ["draw", "让平"], ["away", "让负"]],
-      bf: [["0-0","0:0"],["1-0","1:0"],["2-0","2:0"],["3-0","3:0"],["0-1","0:1"],["1-1","1:1"],["2-1","2:1"],["3-1","3:1"],["0-2","0:2"],["1-2","1:2"],["2-2","2:2"],["0-3","0:3"],["1-3","1:3"],["0-4","0:4"],["2-3","2:3"],["3-2","3:2"],["1-4","1:4"],["2-4","2:4"],["4-0","4:0"],["4-1","4:1"],["4-2","4:2"],["4-3","4:3"],["3-3","3:3"],["3-4","3:4"],["4-4","4:4"],["5-0","5:0"],["5-1","5:1"],["5-2","5:2"],["0-5","0:5"],["1-5","1:5"],["2-5","2:5"],["胜其他","胜其他"],["平其他","平其他"],["负其他","负其他"]],
-      zjq: [["0","0球"],["1","1球"],["2","2球"],["3","3球"],["4","4球"],["5","5球"],["6","6球"],["7","7+球"]],
-      bqc: [["home/home","胜胜"],["home/draw","胜平"],["home/away","胜负"],["draw/home","平胜"],["draw/draw","平平"],["draw/away","平负"],["away/home","负胜"],["away/draw","负平"],["away/away","负负"]],
-    };
-    const selectionLabel = (playType, selection) => {
-      const entry = (CALC_SELECTIONS[playType] || []).find(([value]) => value === selection);
-      return entry ? entry[1] : selection;
-    };
-    const PASS_LABEL = {single: "单关", "2x1": "2串1", "3x1": "3串1", "4x1": "4串1"};
-
-    // 从一场 match 取某玩法的赔率字典：{selection: odds}。
-    // spf / rqspf 复用 match.odds.current 的三赔率；其余玩法从懒加载缓存读取。
-    function matchPlayOdds(match, playType) {
-      if (!match) return null;
-      if (playType === "spf" || playType === "rqspf") {
-        const current = match.odds?.current;
-        return current && (current.home || current.draw || current.away) ? {home: Number(current.home), draw: Number(current.draw), away: Number(current.away)} : null;
-      }
-      const cached = state.calcOddsCache[`${match.id}:${playType}`];
-      return cached ? cached.odds : null;
-    }
-
-    async function loadPlayOddsIfNeeded(match, playType) {
-      if (!match || playType === "spf" || playType === "rqspf") return;
-      const cacheKey = `${match.id}:${playType}`;
-      if (state.calcOddsCache[cacheKey]) return;
-      // 先标记为“加载中”，避免并发重复请求。
-      state.calcOddsCache[cacheKey] = {odds: null, loading: true};
-      try {
-        const payload = await fetchJsonWithTimeout(`/api/data/matches/${encodeURIComponent(match.id)}/odds?play_type=${playType}`, 5000);
-        const odds = payload && payload.odds && typeof payload.odds === "object" ? payload.odds : null;
-        state.calcOddsCache[cacheKey] = {odds: odds && Object.keys(odds).length ? odds : null, loading: false};
-      } catch (error) {
-        state.calcOddsCache[cacheKey] = {odds: null, loading: false};
-      }
-    }
-
-    function renderCalculator() {
-      renderCalcTabs();
-      renderCalcMatches();
-      renderBetSlip();
-    }
-
-    function renderCalcTabs() {
-      $("calcTabs").innerHTML = CALC_PLAY_TABS.map(tab =>
-        `<button class="calc-tab${tab.type === state.calcPlayType ? " active" : ""}" type="button" data-calc-tab="${tab.type}">${tab.label}</button>`
-      ).join("");
-    }
-
-    function handleCalcTabClick(event) {
-      const tab = event.target.closest("[data-calc-tab]");
-      if (!tab) return;
-      const type = tab.dataset.calcTab;
-      if (type === state.calcPlayType) return;
-      state.calcPlayType = type;
-      renderCalcTabs();
-      renderCalcMatches();
-    }
-
-    function filteredCalcMatches() {
-      const query = state.calcQuery;
-      const list = [...state.matches, ...state.manualMatches];
-      const seen = new Set();
-      const deduped = [];
-      for (const match of list) {
-        const id = String(match.id);
-        if (seen.has(id)) continue;
-        seen.add(id);
-        deduped.push(match);
-      }
-      const filtered = deduped.filter(match => {
-        if (!query) return true;
-        return [match.home, match.away, match.league, match.round, match.date].some(value => String(value || "").toLowerCase().includes(query));
-      });
-      // 没有当前玩法选项的赛事（如让球胜平负但该场无 handicap）也保留显示，按钮自然禁用。
-      return filtered;
-    }
-
-    async function renderCalcMatches() {
-      const playType = state.calcPlayType;
-      const list = $("calcList");
-      const matches = filteredCalcMatches();
-      if (!matches.length) {
-        list.innerHTML = `<div class="calc-empty">没有匹配的赛事。</div>`;
-        return;
-      }
-      // bf/zjq/bqc 需要先懒加载赔率；spf/rqspf 可直接渲染。
-      const needsLazy = playType !== "spf" && playType !== "rqspf";
-      const renderRows = () => matches.map(match => renderCalcMatchCard(match, playType)).join("");
-      if (needsLazy) {
-        // 先渲染一次（按钮显“…”占位），并发拉取后逐场补齐。
-        list.innerHTML = renderRows();
-        await Promise.all(matches.map(match => loadPlayOddsIfNeeded(match, playType)));
-      }
-      list.innerHTML = renderRows();
-      list.querySelectorAll("[data-calc-pick]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const matchId = btn.dataset.matchId;
-          const match = matches.find(item => String(item.id) === matchId);
-          if (!match) return;
-          toggleCalcSelection(match, btn);
-        });
-      });
-    }
-
-    function renderCalcMatchCard(match, playType) {
-      const odds = matchPlayOdds(match, playType);
-      const options = CALC_SELECTIONS[playType] || [];
-      const cached = playType !== "spf" && playType !== "rqspf" ? state.calcOddsCache[`${match.id}:${playType}`] : null;
-      const loading = cached && cached.loading;
-      const handiTag = playType === "rqspf" && (match.handicap !== null && match.handicap !== undefined) ? `<span class="calc-handi">让${match.handicap > 0 ? "+" : ""}${match.handicap}</span>` : "";
-      const oddsClass = options.length <= 4 ? "three" : "grid";
-      const buttons = options.map(([value, label]) => {
-        const val = odds ? odds[value] : null;
-        const hasVal = val !== null && val !== undefined && !Number.isNaN(Number(val));
-        const active = cartHas(match.id, playType, value) ? " active" : "";
-        const disabled = (!odds || !hasVal) ? " disabled" : "";
-        const shown = loading && !hasVal ? "…" : (hasVal ? formatOdds(Number(val)) : "—");
-        return `<button class="calc-odds-btn${active}${disabled}" type="button" data-calc-pick data-match-id="${escapeHtml(match.id)}" data-play="${playType}" data-selection="${escapeHtml(value)}"${disabled}><span class="calc-odds-lbl">${escapeHtml(label)}</span><span class="calc-odds-val">${shown}</span></button>`;
-      }).join("");
-      return `<div class="calc-match"><div class="calc-match-head"><span class="calc-league">${escapeHtml(match.league || "未知联赛")} · ${escapeHtml(match.round || "")} · ${escapeHtml(match.date || "")}</span>${handiTag}</div><div class="calc-match-teams"><span>${escapeHtml(match.home || "主队")}</span><span class="calc-vs">VS</span><span>${escapeHtml(match.away || "客队")}</span></div><div class="calc-odds ${oddsClass}">${buttons}</div></div>`;
-    }
-
-    function cartHas(matchId, playType, selection) {
-      return state.betCart.some(leg => leg.matchId === String(matchId) && leg.playType === playType && leg.selection === selection);
-    }
-
-    function formatOdds(value) {
-      const num = Number(value);
-      if (!Number.isFinite(num)) return "—";
-      return Number.isInteger(num) ? String(num) : num.toFixed(2);
-    }
-
-    function toggleCalcSelection(match, btn) {
-      const playType = btn.dataset.play;
-      const selection = btn.dataset.selection;
-      const odds = matchPlayOdds(match, playType);
-      const value = odds ? Number(odds[selection]) : null;
-      if (value === null || value === undefined || Number.isNaN(value)) return;
-      const matchId = String(match.id);
-      const label = selectionLabel(playType, selection);
-      const existing = state.betCart.findIndex(leg => leg.matchId === matchId && leg.playType === playType);
-      if (existing >= 0) {
-        // 同场同玩法已有选：若同一项则取消，否则替换该项。
-        if (state.betCart[existing].selection === selection) {
-          state.betCart.splice(existing, 1);
-        } else {
-          state.betCart[existing] = {...state.betCart[existing], selection, odds: value, label};
-        }
-      } else {
-        if (state.betCart.length >= 4) {
-          setBetMessage("最多选择 4 场不同赛事进行串关。");
-          return;
-        }
-        if (state.betCart.some(leg => leg.matchId === matchId)) {
-          setBetMessage("同一赛事在串关中只能选择一个玩法选项。");
-          return;
-        }
-        state.betCart.push({matchId, playType, selection, odds: value, label, matchName: `${match.home} vs ${match.away}`, handicap: playType === "rqspf" ? match.handicap : null});
-        setBetMessage("");
-      }
-      renderCalcMatches();
-      renderBetSlip();
-    }
-
-    function calcTotalOdds() {
-      return state.betCart.reduce((acc, leg) => acc * leg.odds, 1);
-    }
-
-    function passTypeForCart() {
-      const count = state.betCart.length;
-      return {1: "single", 2: "2x1", 3: "3x1", 4: "4x1"}[count] || null;
-    }
-
-    function renderBetSlip() {
-      const slip = $("calcSlip");
-      const count = state.betCart.length;
-      const passType = passTypeForCart();
-      if (!count) {
-        slip.innerHTML = `<div class="calc-slip-head"><h3>投注单</h3><span class="calc-count">0 注</span></div><div class="calc-slip-empty">点击左侧赛事的赔率按钮<br>即可加入投注单</div>`;
-        return;
-      }
-      const legsHtml = state.betCart.map((leg, index) => {
-        const playLabel = CALC_PLAY_LABEL[leg.playType] || leg.playType;
-        const handi = leg.handicap !== null && leg.handicap !== undefined ? ` · 让${leg.handicap > 0 ? "+" : ""}${leg.handicap}` : "";
-        return `<div class="calc-leg"><div><b>${escapeHtml(leg.matchName)}</b><small>${escapeHtml(playLabel)} · ${escapeHtml(leg.label)}${handi} · <span class="calc-leg-odds">@${formatOdds(leg.odds)}</span></small></div><button class="calc-leg-rm" type="button" data-leg-remove="${index}" aria-label="移除">×</button></div>`;
-      }).join("");
-      const totalOdds = calcTotalOdds();
-      const stake = (Number(state.calcUnit) || 0) * (Number(state.calcTimes) || 0);
-      const payout = totalOdds * stake;
-      slip.innerHTML = `
-        <div class="calc-slip-head"><h3>投注单</h3><div style="display:flex;align-items:center;gap:8px"><span class="calc-count">${count} 注</span><button class="calc-clear" type="button" data-cart-clear>清空</button></div></div>
-        <div class="calc-legs">${legsHtml}</div>
-        <div class="calc-slip-foot">
-          <div class="calc-pass"><span>过关方式</span><span class="calc-pass-tag">${escapeHtml(PASS_LABEL[passType] || "--")}</span></div>
-          <div class="calc-amounts">
-            <label class="calc-field"><span>每注金额（元）</span><input class="input" id="calcUnitInput" type="number" min="0.01" step="0.01" value="${state.calcUnit}" inputmode="decimal"></label>
-            <label class="calc-field"><span>倍数</span><input class="input" id="calcTimesInput" type="number" min="1" step="1" value="${state.calcTimes}" inputmode="numeric"></label>
-          </div>
-          <div class="calc-odds-line"><span>总赔率</span><b>${formatOdds(totalOdds)}</b></div>
-          <div class="calc-odds-line"><span>总投入</span><b>${stake.toFixed(2)} 元</b></div>
-          <div class="calc-payout"><span>预计派奖</span><b>${payout.toFixed(2)}</b></div>
-          <button class="btn primary calc-submit" type="button" data-cart-submit>保存这条计划</button>
-        </div>`;
-    }
-
-    function handleCalcListClick(event) {
-      // 由按钮自身的监听器处理，事件委托兜底（保持稳健）。
-      const btn = event.target.closest("[data-calc-pick]");
-      if (!btn || btn.disabled) return;
-    }
-
-    function handleCalcSlipClick(event) {
-      const removeBtn = event.target.closest("[data-leg-remove]");
-      if (removeBtn) {
-        const index = Number(removeBtn.dataset.legRemove);
-        state.betCart.splice(index, 1);
-        renderCalcMatches();
-        renderBetSlip();
-        setBetMessage("");
-        return;
-      }
-      const clearBtn = event.target.closest("[data-cart-clear]");
-      if (clearBtn) {
-        state.betCart = [];
-        renderCalcMatches();
-        renderBetSlip();
-        setBetMessage("");
-        return;
-      }
-      const submitBtn = event.target.closest("[data-cart-submit]");
-      if (submitBtn) {
-        submitBetCart().catch(error => setBetMessage(error.message));
-      }
-    }
-
-    function handleCalcSlipInput(event) {
-      const target = event.target;
-      if (target.id === "calcUnitInput") {
-        const value = Number(target.value);
-        state.calcUnit = Number.isFinite(value) && value > 0 ? value : state.calcUnit;
-        renderBetSlip();
-      } else if (target.id === "calcTimesInput") {
-        const value = Math.floor(Number(target.value));
-        state.calcTimes = Number.isFinite(value) && value >= 1 ? value : state.calcTimes;
-        renderBetSlip();
-      }
-    }
-
-    async function submitBetCart() {
-      const passType = passTypeForCart();
-      if (!passType) { setBetMessage("请先至少选择一个选项。"); return; }
-      const stake = (Number(state.calcUnit) || 0) * (Number(state.calcTimes) || 0);
-      if (!(stake > 0)) { setBetMessage("请填写有效的每注金额与倍数。"); return; }
-      for (const leg of state.betCart) {
-        if (!(leg.odds > 1)) { setBetMessage(`选项「${leg.label}」的赔率无效，请刷新赛事数据。`); return; }
-      }
-      const legs = state.betCart.map(leg => ({
-        match_id: leg.matchId,
-        play_type: leg.playType,
-        selection: leg.selection,
-        handicap: leg.playType === "rqspf" ? leg.handicap : null,
-        odds: leg.odds,
-      }));
-      const payload = {pass_type: passType, stake, legs};
-      try {
-        await apiRequest("/bets", {method: "POST", body: JSON.stringify(payload)});
-        setBetMessage("记录已保存，赛果更新后将自动结算。");
-        state.betCart = [];
-        renderCalcMatches();
-        renderBetSlip();
-        await loadBetRecords();
-      } catch (error) { setBetMessage(error.message); }
-    }
-
-    function renderBetRecord(bet) {
-      const playLabels = {spf: "胜平负", rqspf: "让球胜平负", bf: "比分", zjq: "总进球", bqc: "半全场"};
-      const bqcLabels = {"home/home":"胜胜","home/draw":"胜平","home/away":"胜负","draw/home":"平胜","draw/draw":"平平","draw/away":"平负","away/home":"负胜","away/draw":"负平","away/away":"负负"};
-      const status = {pending: "待结算", won: "已命中", lost: "未命中"};
-      const legs = Array.isArray(bet.legs) && bet.legs.length ? bet.legs : null;
-      const legText = (leg) => {
-        const playType = leg.play_type || bet.play_type;
-        const sel = playType === "spf" || playType === "rqspf"
-          ? ({home: "主胜", draw: "平", away: "客胜"}[leg.selection] || leg.selection)
-          : (playType === "bqc" ? (bqcLabels[leg.selection] || leg.selection) : leg.selection);
-        const handi = playType === "rqspf" && (leg.handicap !== null && leg.handicap !== undefined) ? ` 让${leg.handicap > 0 ? "+" : ""}${leg.handicap}` : "";
-        return `${playLabels[playType] || playType} · ${escapeHtml(sel)}${handi} @${leg.odds}`;
-      };
-      const passTag = bet.pass_type && bet.pass_type !== "single" ? `${PASS_LABEL[bet.pass_type] || bet.pass_type} · ` : "";
-      const actions = bet.status === "pending" && !legs ? `<div class="history-actions"><button class="history-action" type="button" data-bet-edit="${bet.id}">修改</button><button class="history-action danger" type="button" data-bet-delete="${bet.id}">删除</button></div>` : (bet.status === "pending" ? `<div class="history-actions"><button class="history-action danger" type="button" data-bet-delete="${bet.id}">删除</button></div>` : "");
-      if (legs) {
-        const legsDetail = legs.map(leg => `<div>${escapeHtml(leg.match_name || "")} · ${legText(leg)}</div>`).join("");
-        return `<div class="history-row"><div><b>${escapeHtml(passTag)}共 ${legs.length} 场</b><small style="display:block;margin-top:5px">${legsDetail}<span style="display:block;margin-top:4px">投注金额 ${bet.stake}</span></small></div><div class="history-hit">${status[bet.status] || bet.status}<br><small>${bet.profit === null ? "--" : Number(bet.profit).toFixed(2)}</small>${actions}</div></div>`;
-      }
-      const sel = bet.play_type === "spf" || bet.play_type === "rqspf"
-        ? ({home: "主胜", draw: "平", away: "客胜"}[bet.selection] || bet.selection)
-        : (bet.play_type === "bqc" ? (bqcLabels[bet.selection] || bet.selection) : bet.selection);
-      const handicap = bet.handicap === null || bet.handicap === undefined ? "" : ` · 让${bet.handicap > 0 ? "+" : ""}${bet.handicap}`;
-      return `<div class="history-row"><div><b>${escapeHtml(bet.match_name || bet.match_id)}</b><small>${playLabels[bet.play_type] || bet.play_type} · ${escapeHtml(sel)}${handicap} · 参考赔率 ${bet.odds} · 投注金额 ${bet.stake}</small></div><div class="history-hit">${status[bet.status] || bet.status}<br><small>${bet.profit === null ? "--" : Number(bet.profit).toFixed(2)}</small>${actions}</div></div>`;
-    }
-
-    function handleBetRecordAction(event) {
-      const button = event.target.closest("[data-bet-edit], [data-bet-delete]");
-      if (!button) return;
-      const betId = Number(button.dataset.betEdit || button.dataset.betDelete);
-      if (button.dataset.betEdit) editBetRecord(betId);
-      if (button.dataset.betDelete) deleteBetRecord(betId);
-    }
-
-    // 修改：仅单关 pending 记录可回填到投注单再编辑（串关已结算不可改，沿用后端约束）。
-    function editBetRecord(betId) {
-      const bet = state.bets.find(item => item.id === betId);
-      if (!bet || bet.status !== "pending" || (Array.isArray(bet.legs) && bet.legs.length)) return;
-      state.betCart = [{
-        matchId: String(bet.match_id),
-        playType: bet.play_type,
-        selection: bet.selection,
-        odds: bet.odds,
-        label: selectionLabel(bet.play_type, bet.selection),
-        matchName: bet.match_name || bet.match_id,
-        handicap: bet.handicap,
-      }];
-      state.calcPlayType = bet.play_type;
-      // 先删旧记录，提交时再用单关新建一笔等价记录。
-      apiRequest(`/bets/${betId}`, {method: "DELETE"}).then(() => {
-        setBetMessage("已载入该记录到投注单，调整后点「保存这条计划」即可。");
-        renderCalculator();
-        renderBetSlip();
-      }).catch(error => setBetMessage(error.message));
-    }
-
-    async function deleteBetRecord(betId) {
-      const bet = state.bets.find(item => item.id === betId);
-      if (!bet || bet.status !== "pending") return;
-      if (!confirm(`确定删除「${bet.match_name || (Array.isArray(bet.legs) && bet.legs.length ? `${bet.legs.length}场串关` : bet.match_id)}」的下注记录吗？`)) return;
-      try {
-        await apiRequest(`/bets/${betId}`, {method: "DELETE"});
-        setBetMessage("下注记录已删除。");
-        await loadBetRecords();
-      } catch (error) { setBetMessage(error.message); }
-    }
-
-    async function openBetRecorder() {
-      if (!state.user) { openAccountLayer(); return; }
-      // 打开计算器，并把当前赛事主推方向作为单关预填（保留原「一键带入推荐」体验）。
-      state.betCart = [];
-      state.calcPlayType = "spf";
+    function openBetRecorder() {
       const match = activeMatch();
-      if (match) {
-        const key = outcomeKey[match?.conclusion?.primary] || "home";
-        const current = match.odds?.current;
-        if (current && (current.home || current.draw || current.away)) {
-          state.betCart = [{
-            matchId: String(match.id),
-            playType: "spf",
-            selection: key,
-            odds: Number(current[key]) || Number(current.home),
-            label: selectionLabel("spf", key),
-            matchName: `${match.home} vs ${match.away}`,
-            handicap: null,
-          }];
-        }
-      }
-      $("accountLayer").classList.remove("hidden");
-      document.body.classList.add("history-open");
-      setBetMessage("");
-      renderCalculator();
-      loadBetRecords().catch(e => setBetMessage(e.message));
+      const selection = outcomeKey[match?.conclusion?.primary] || "home";
+      const params = new URLSearchParams({
+        match_id: String(match?.id || state.activeId || ""),
+        play_type: "spf",
+        selection,
+      });
+      const url = `/calculator.html?${params.toString()}`;
+      const popup = window.open(url, "_blank");
+      if (popup) return;
+      location.href = url;
     }
-
-    function setBetMessage(value) { $("betMessage").textContent = value; }
 
     async function init() {
       document.body.classList.add("loading");

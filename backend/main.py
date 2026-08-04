@@ -1260,6 +1260,11 @@ def account_page() -> FileResponse:
     return FileResponse(ROOT / "account.html", headers={"Cache-Control": "no-cache"})
 
 
+@app.get("/calculator.html", include_in_schema=False)
+def calculator_page() -> FileResponse:
+    return FileResponse(ROOT / "calculator.html", headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/login.html", include_in_schema=False)
 def login_page() -> FileResponse:
     return FileResponse(ROOT / "login.html", headers={"Cache-Control": "no-cache"})

@@ -34,6 +34,15 @@
     const state = { csrfToken: "" };
     const $ = (id) => document.getElementById(id);
 
+    function safeNextPath() {
+      const raw = new URLSearchParams(location.search).get("next") || "";
+      if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\")) return "";
+      try {
+        const target = new URL(raw, location.origin);
+        return target.origin === location.origin ? `${target.pathname}${target.search}${target.hash}` : "";
+      } catch (error) { return ""; }
+    }
+
     function bindEvents() {
       $("gateLoginForm").addEventListener("submit", loginGate);
       $("gateRegisterForm").addEventListener("submit", registerGate);
@@ -76,7 +85,8 @@
         const payload = await apiRequest(path, {method: "POST", body: JSON.stringify({email: $("gateEmail").value, password: $("gatePassword").value})});
         if (isAdminLogin) localStorage.setItem("football_ai_admin_session", payload.token);
         localStorage.setItem("football_ai_session", payload.token);
-        location.href = isAdminLogin || (payload.user && payload.user.is_active) ? "/" : "/account.html";
+        const nextPath = safeNextPath();
+        location.href = nextPath || (isAdminLogin || (payload.user && payload.user.is_active) ? "/" : "/account.html");
       } catch (error) { $("gateMessage").textContent = error.message; }
     }
 
