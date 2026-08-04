@@ -649,7 +649,7 @@ def latest_play_odds(match: dict, play_type: str) -> dict | None:
             elif play_type == "bf":
                 normalized = {}
                 for key, value in prices.items():
-                    selection = normalize_score_selection(key)
+                    selection = normalize_source_score_selection(key)
                     if selection:
                         normalized[selection] = value
                 prices = normalized
@@ -1041,12 +1041,12 @@ VALID_SELECTIONS = PLAY_SELECTIONS["spf"]
 
 
 def normalize_score_selection(value: object) -> str | None:
-    """Normalize canonical BF values while retaining numeric legacy snapshots."""
+    """Normalize stored/submitted BF values, including compact legacy scores."""
     raw = str(value or "").strip().lower().replace("：", ":")
     other_aliases = {
-        "home-other": "home-other", "胜其他": "home-other", "主胜其他": "home-other", "胜其它": "home-other", "3a": "home-other", "90": "home-other",
-        "draw-other": "draw-other", "平其他": "draw-other", "平局其他": "draw-other", "平其它": "draw-other", "1a": "draw-other", "99": "draw-other",
-        "away-other": "away-other", "负其他": "away-other", "客胜其他": "away-other", "负其它": "away-other", "0a": "away-other", "09": "away-other",
+        "home-other": "home-other", "胜其他": "home-other", "主胜其他": "home-other", "胜其它": "home-other", "3a": "home-other",
+        "draw-other": "draw-other", "平其他": "draw-other", "平局其他": "draw-other", "平其它": "draw-other", "1a": "draw-other",
+        "away-other": "away-other", "负其他": "away-other", "客胜其他": "away-other", "负其它": "away-other", "0a": "away-other",
     }
     if raw in other_aliases:
         return other_aliases[raw]
@@ -1056,6 +1056,13 @@ def normalize_score_selection(value: object) -> str | None:
     if re.fullmatch(r"\d{2}", raw):
         return f"{raw[0]}-{raw[1]}"
     return None
+
+
+def normalize_source_score_selection(value: object) -> str | None:
+    """Normalize BF odds-source codes whose 90/99/09 values mean other scores."""
+    raw = str(value or "").strip().lower().replace("：", ":")
+    source_other = {"90": "home-other", "99": "draw-other", "09": "away-other"}
+    return source_other.get(raw) or normalize_score_selection(raw)
 
 
 def selection_is_valid(play_type: str, selection: str) -> bool:
