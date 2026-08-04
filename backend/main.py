@@ -616,18 +616,17 @@ def match_plays(match_id: str, db: Session = Depends(db_session)) -> dict:
     match = next((item for item in load_matches(db) if str(item.get("id")) == match_id), None)
     if not match:
         raise HTTPException(status_code=404, detail="赛事不存在")
-    play_odds = (match.get("odds") or {}).get("plays") or {}
     return {
         "match_id": str(match.get("id")),
         "fixture_id": match.get("fixtureId"),
         "kickoff": match.get("date"),
         "handicap": match.get("handicap"),
         "plays": [
-            {"type": "spf", "label": "胜平负", "selections": ["home", "draw", "away"]},
-            {"type": "rqspf", "label": "让球胜平负", "handicap": match.get("handicap"), "selections": ["home", "draw", "away"]},
-            {"type": "bf", "label": "比分", "selections": sorted((play_odds.get("bf") or {}).keys())},
-            {"type": "zjq", "label": "总进球", "selections": sorted((play_odds.get("zjq") or {}).keys()) or [str(value) for value in range(8)]},
-            {"type": "bqc", "label": "半全场", "selections": sorted((play_odds.get("bqc") or {}).keys()) or sorted(PLAY_SELECTIONS["bqc"])},
+            {"type": "spf", "label": "胜平负", "selections": sorted((latest_play_odds(match, "spf") or {}).keys())},
+            {"type": "rqspf", "label": "让球胜平负", "handicap": match.get("handicap"), "selections": sorted((latest_play_odds(match, "rqspf") or {}).keys())},
+            {"type": "bf", "label": "比分", "selections": sorted((latest_play_odds(match, "bf") or {}).keys())},
+            {"type": "zjq", "label": "总进球", "selections": sorted((latest_play_odds(match, "zjq") or {}).keys())},
+            {"type": "bqc", "label": "半全场", "selections": sorted((latest_play_odds(match, "bqc") or {}).keys())},
         ],
     }
 
@@ -635,18 +634,26 @@ def match_plays(match_id: str, db: Session = Depends(db_session)) -> dict:
 def latest_play_odds(match: dict, play_type: str) -> dict | None:
     odds = match.get("odds") or {}
     candidates = [
-        odds.get(play_type),
         (odds.get("plays") or {}).get(play_type),
+        odds.get(play_type),
         (match.get("playOdds") or {}).get(play_type),
         (match.get("officialOdds") or {}).get(play_type),
     ]
     for candidate in candidates:
         if isinstance(candidate, dict) and candidate:
             prices = candidate.get("current", candidate)
-            if play_type == "bqc" and isinstance(prices, dict):
-                # Read snapshots created before the bqc normalization as well.
-                return {BQC_SOURCE_SELECTIONS.get(str(key), str(key)): value for key, value in prices.items()}
-            return prices
+            if not isinstance(prices, dict):
+                continue
+            if play_type == "bqc":
+                prices = {BQC_SOURCE_SELECTIONS.get(str(key), str(key)): value for key, value in prices.items()}
+            elif play_type == "bf":
+                normalized = {}
+                for key, value in prices.items():
+                    selection = normalize_score_selection(key)
+                    if selection:
+                        normalized[selection] = value
+                prices = normalized
+            return prices or None
     if play_type == "spf" and isinstance(odds.get("current"), dict):
         return odds["current"]
     return None
@@ -659,12 +666,16 @@ def match_latest_odds(match_id: str, play_type: str = "spf", db: Session = Depen
     match = next((item for item in load_matches(db) if str(item.get("id")) == match_id), None)
     if not match:
         raise HTTPException(status_code=404, detail="赛事不存在")
+    play_odds = latest_play_odds(match, play_type)
+    available = bool(play_odds)
     return {
         "match_id": match_id,
         "play_type": play_type,
         "fixture_id": match.get("fixtureId"),
         "updated_at": match.get("updatedAt") or match.get("odds", {}).get("updatedAt") or (db.get(DataSnapshot, "matches").updated_at.isoformat() if db.get(DataSnapshot, "matches") else None),
-        "odds": latest_play_odds(match, play_type),
+        "odds": play_odds,
+        "available": available,
+        "reason": None if available else "当前数据源未提供该玩法赔率",
         "source": "当前数据库赛事快照",
     }
 
@@ -1008,10 +1019,16 @@ def delete_activation_code(code_id: int, _: AdminSession = Depends(current_admin
     return {"message": "激活码已删除"}
 
 
+BF_EXACT_SELECTIONS = {
+    "1-0", "2-0", "2-1", "3-0", "3-1", "3-2", "4-0", "4-1", "4-2", "5-0", "5-1", "5-2",
+    "0-0", "1-1", "2-2", "3-3",
+    "0-1", "0-2", "1-2", "0-3", "1-3", "2-3", "0-4", "1-4", "2-4", "0-5", "1-5", "2-5",
+}
+BF_OTHER_SELECTIONS = {"home-other", "draw-other", "away-other"}
 PLAY_SELECTIONS = {
     "spf": {"home", "draw", "away"},
     "rqspf": {"home", "draw", "away"},
-    "bf": set(),
+    "bf": BF_EXACT_SELECTIONS | BF_OTHER_SELECTIONS,
     "zjq": {str(value) for value in range(0, 8)},
     "bqc": {"home/home", "home/draw", "home/away", "draw/home", "draw/draw", "draw/away", "away/home", "away/draw", "away/away"},
 }
@@ -1023,9 +1040,28 @@ BQC_SOURCE_SELECTIONS = {
 VALID_SELECTIONS = PLAY_SELECTIONS["spf"]
 
 
+def normalize_score_selection(value: object) -> str | None:
+    """Normalize canonical BF values while retaining numeric legacy snapshots."""
+    raw = str(value or "").strip().lower().replace("：", ":")
+    other_aliases = {
+        "home-other": "home-other", "胜其他": "home-other", "主胜其他": "home-other", "胜其它": "home-other", "3a": "home-other", "90": "home-other",
+        "draw-other": "draw-other", "平其他": "draw-other", "平局其他": "draw-other", "平其它": "draw-other", "1a": "draw-other", "99": "draw-other",
+        "away-other": "away-other", "负其他": "away-other", "客胜其他": "away-other", "负其它": "away-other", "0a": "away-other", "09": "away-other",
+    }
+    if raw in other_aliases:
+        return other_aliases[raw]
+    found = re.fullmatch(r"(\d{1,2})\s*[-:]\s*(\d{1,2})", raw)
+    if found:
+        return f"{int(found.group(1))}-{int(found.group(2))}"
+    if re.fullmatch(r"\d{2}", raw):
+        return f"{raw[0]}-{raw[1]}"
+    return None
+
+
 def selection_is_valid(play_type: str, selection: str) -> bool:
     if play_type == "bf":
-        return bool(re.fullmatch(r"\d{1,2}-\d{1,2}", selection))
+        normalized = normalize_score_selection(selection)
+        return normalized in PLAY_SELECTIONS["bf"]
     return selection in PLAY_SELECTIONS.get(play_type, set())
 
 
@@ -1046,8 +1082,16 @@ def create_bet(payload: BetRequest, user: User = Depends(current_user), db: Sess
         if leg.play_type == "rqspf" and leg.handicap is None:
             raise HTTPException(status_code=422, detail="让球胜平负必须填写让球数")
     first_leg = legs[0]
-    serialized_legs = [{**leg.model_dump(), "match_name": match_display_name(matches[leg.match_id])} for leg in legs]
-    bet = Bet(user_id=user.id, match_id=first_leg.match_id, match_name=match_display_name(matches[first_leg.match_id]), pass_type=payload.pass_type, parlay_legs=serialized_legs if payload.pass_type != "single" else None, play_type=first_leg.play_type, selection=first_leg.selection, handicap=first_leg.handicap, odds=first_leg.odds, stake=payload.stake)
+    serialized_legs = [
+        {
+            **leg.model_dump(),
+            "selection": normalize_score_selection(leg.selection) if leg.play_type == "bf" else leg.selection,
+            "match_name": match_display_name(matches[leg.match_id]),
+        }
+        for leg in legs
+    ]
+    first_selection = normalize_score_selection(first_leg.selection) if first_leg.play_type == "bf" else first_leg.selection
+    bet = Bet(user_id=user.id, match_id=first_leg.match_id, match_name=match_display_name(matches[first_leg.match_id]), pass_type=payload.pass_type, parlay_legs=serialized_legs if payload.pass_type != "single" else None, play_type=first_leg.play_type, selection=first_selection, handicap=first_leg.handicap, odds=first_leg.odds, stake=payload.stake)
     db.add(bet)
     db.commit()
     db.refresh(bet)
@@ -1080,7 +1124,7 @@ def update_bet(bet_id: int, payload: BetUpdateRequest, user: User = Depends(curr
         raise HTTPException(status_code=422, detail="让球胜平负必须填写让球数")
 
     bet.play_type = play_type
-    bet.selection = selection
+    bet.selection = normalize_score_selection(selection) if play_type == "bf" else selection
     bet.handicap = handicap if play_type == "rqspf" else None
     if payload.odds is not None:
         bet.odds = payload.odds
@@ -1169,7 +1213,15 @@ def bet_result(match: dict, bet: Bet) -> str | None:
         adjusted_home = home + (bet.handicap or 0)
         return "home" if adjusted_home > away else "away" if adjusted_home < away else "draw"
     if bet.play_type == "bf":
-        return f"{home}-{away}"
+        exact_result = f"{home}-{away}"
+        bet_selection = normalize_score_selection(bet.selection)
+        # Numeric selections outside today's official set are legacy bets. They
+        # must continue to settle against the actual score instead of an other bucket.
+        if bet_selection and re.fullmatch(r"\d{1,2}-\d{1,2}", bet_selection) and bet_selection not in BF_EXACT_SELECTIONS:
+            return exact_result
+        if exact_result in BF_EXACT_SELECTIONS:
+            return exact_result
+        return "home-other" if home > away else "away-other" if home < away else "draw-other"
     if bet.play_type == "zjq":
         return str(min(home + away, 7))
     if bet.play_type == "bqc":
@@ -1181,6 +1233,12 @@ def bet_result(match: dict, bet: Bet) -> str | None:
         second = "home" if home > away else "away" if home < away else "draw"
         return f"{first}/{second}"
     return None
+
+
+def selection_matches_result(play_type: str, selection: str, result: str) -> bool:
+    if play_type == "bf":
+        return normalize_score_selection(selection) == result
+    return selection == result
 
 
 def settle_all(db: Session) -> int:
@@ -1199,7 +1257,7 @@ def settle_all(db: Session) -> int:
                 leg_results.append((leg, result))
             if not leg_results:
                 continue
-            bet.result = "串关命中" if all(leg["selection"] == result for leg, result in leg_results) else "串关未命中"
+            bet.result = "串关命中" if all(selection_matches_result(leg["play_type"], leg["selection"], result) for leg, result in leg_results) else "串关未命中"
             bet.status = "won" if bet.result == "串关命中" else "lost"
             combined_odds = 1.0
             for leg, _ in leg_results:
@@ -1212,7 +1270,7 @@ def settle_all(db: Session) -> int:
         if not result:
             continue
         bet.result = result
-        bet.status = "won" if bet.selection == result else "lost"
+        bet.status = "won" if selection_matches_result(bet.play_type, bet.selection, result) else "lost"
         bet.profit = round(bet.stake * (bet.odds - 1), 2) if bet.status == "won" else round(-bet.stake, 2)
         bet.settled_at = now()
         settled += 1

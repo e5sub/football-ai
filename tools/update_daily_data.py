@@ -83,10 +83,16 @@ def main() -> None:
 
     if current_rows:
         play_odds_by_type: dict[str, dict[str, dict[str, float]]] = {}
+        current_fixture_ids = {str(row.get("fixture_id") or "") for row in current_rows if row.get("fixture_id")}
         for play_type, play_url in PLAY_ODDS_URLS.items():
             try:
                 play_rows = parse_play_rows(fetch_text(play_url), play_type)
-                play_odds_by_type[play_type] = {str(row["fixture_id"]): row["play_odds"] for row in play_rows if row.get("fixture_id")}
+                rows_by_fixture = {str(row["fixture_id"]): row["play_odds"] for row in play_rows if row.get("fixture_id")}
+                play_odds_by_type[play_type] = rows_by_fixture
+                if not play_rows:
+                    warnings.append(f"{play_type} 玩法赔率请求成功但解析为 0 行")
+                elif not (set(rows_by_fixture) & current_fixture_ids):
+                    warnings.append(f"{play_type} 玩法赔率请求成功但与当前赛事 fixture 交集为 0")
             except Exception as exc:  # noqa: BLE001
                 play_odds_by_type[play_type] = {}
                 warnings.append(f"{play_type} 玩法赔率更新失败：{exc}")
@@ -174,6 +180,10 @@ def main() -> None:
         "teams": len(team_profiles),
         "archive": len(archive),
         "fixtureCatalog": len(fixture_catalog.get("matches") or []),
+        "playOdds": {
+            play_type: sum(bool(((match.get("odds") or {}).get("plays") or {}).get(play_type)) for match in matches)
+            for play_type in ("spf", "rqspf", "bf", "zjq", "bqc")
+        },
         "database": database_status,
         "warnings": warnings[:5],
     }
@@ -410,6 +420,25 @@ def parse_market_odds(body: str, market_type: str) -> list[float]:
     return [values[key] for key in ("3", "1", "0") if key in values]
 
 
+def normalize_score_selection(value: Any) -> str | None:
+    """Normalize BF source values without guessing ambiguous words or long digit strings."""
+    raw = html_lib.unescape(str(value or "")).strip().lower().replace("：", ":")
+    other_aliases = {
+        "home-other": "home-other", "胜其他": "home-other", "主胜其他": "home-other", "胜其它": "home-other", "3a": "home-other", "90": "home-other",
+        "draw-other": "draw-other", "平其他": "draw-other", "平局其他": "draw-other", "平其它": "draw-other", "1a": "draw-other", "99": "draw-other",
+        "away-other": "away-other", "负其他": "away-other", "客胜其他": "away-other", "负其它": "away-other", "0a": "away-other", "09": "away-other",
+    }
+    if raw in other_aliases:
+        return other_aliases[raw]
+    found = re.fullmatch(r"(\d{1,2})\s*[-:]\s*(\d{1,2})", raw)
+    if found:
+        return f"{int(found.group(1))}-{int(found.group(2))}"
+    # Some source snapshots encode ordinary single-digit score pairs as 10/21.
+    if re.fullmatch(r"\d{2}", raw):
+        return f"{raw[0]}-{raw[1]}"
+    return None
+
+
 def parse_play_odds(body: str) -> dict[str, dict[str, float]]:
     """Extract all supported 500 JC play odds from data attributes."""
     # 500 uses `nspf` for regular win/draw/loss and `spf` for the
@@ -431,6 +460,13 @@ def parse_play_odds(body: str) -> dict[str, dict[str, float]]:
         if play_type in plays:
             mapped = {"home": plays[play_type].get("3"), "draw": plays[play_type].get("1"), "away": plays[play_type].get("0")}
             plays[play_type] = {key: value for key, value in mapped.items() if value is not None}
+    if "bf" in plays:
+        normalized_scores: dict[str, float] = {}
+        for value, price in plays["bf"].items():
+            selection = normalize_score_selection(value)
+            if selection:
+                normalized_scores[selection] = price
+        plays["bf"] = normalized_scores
     if "bqc" in plays:
         # 500 encodes half/full outcomes as 3-3, 3-1, … rather than the
         # scoreline. Store the same canonical values used by settlement logic.
@@ -2452,7 +2488,15 @@ def build_meta(old_payload: dict[str, Any], matches: list[dict[str, Any]], histo
         "historySample": base_history_sample + len(history),
         "finishedSample": base_finished_sample + len(history),
         "historyRange": f"{DEFAULT_BASE_HISTORY_START} 至 {history_end}" if history_end else old_meta.get("historyRange", ""),
-        "dailyUpdate": {"status": status, "historyRows": len(history), "warnings": warnings[:12]},
+        "dailyUpdate": {
+            "status": status,
+            "historyRows": len(history),
+            "playOdds": {
+                play_type: sum(bool(((match.get("odds") or {}).get("plays") or {}).get(play_type)) for match in matches)
+                for play_type in ("spf", "rqspf", "bf", "zjq", "bqc")
+            },
+            "warnings": warnings[:12],
+        },
         "compliance": "仅提供体育数据分析、赛前研究与内容创作参考；不涉及赌博，不提供下注服务，不承诺结果。",
     }
 
