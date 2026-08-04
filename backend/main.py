@@ -267,8 +267,8 @@ class ParlayLegRequest(BaseModel):
 
 class BetRequest(ParlayLegRequest):
     stake: float = Field(gt=0, le=1000000)
-    pass_type: str = Field(default="single", pattern="^(single|2x1|3x1|4x1)$")
-    legs: list[ParlayLegRequest] = Field(default_factory=list, max_length=4)
+    pass_type: str = Field(default="single", pattern="^(single|2x1|3x1|4x1|5x1|6x1|7x1|8x1)$")
+    legs: list[ParlayLegRequest] = Field(default_factory=list, max_length=8)
 
 
 class BetUpdateRequest(BaseModel):
@@ -1076,7 +1076,7 @@ def selection_is_valid(play_type: str, selection: str) -> bool:
 def create_bet(payload: BetRequest, user: User = Depends(current_user), db: Session = Depends(db_session)) -> dict:
     matches = {str(match.get("id")): match for match in load_matches(db)}
     legs = payload.legs or [ParlayLegRequest(match_id=payload.match_id, play_type=payload.play_type, selection=payload.selection, handicap=payload.handicap, odds=payload.odds)]
-    expected_legs = {"single": 1, "2x1": 2, "3x1": 3, "4x1": 4}[payload.pass_type]
+    expected_legs = {"single": 1, "2x1": 2, "3x1": 3, "4x1": 4, "5x1": 5, "6x1": 6, "7x1": 7, "8x1": 8}[payload.pass_type]
     if len(legs) != expected_legs:
         raise HTTPException(status_code=422, detail=f"{payload.pass_type}需要选择{expected_legs}场不同赛事")
     if len({leg.match_id for leg in legs}) != len(legs):

@@ -1,7 +1,7 @@
 // Never cache API responses.  In particular, auth/me and csrf responses are
 // user/session specific; caching either makes a browser appear logged out after
 // a refresh and leaves POST requests carrying an expired CSRF token.
-const CACHE_NAME = "football-ai-command-center-v16";
+const CACHE_NAME = "football-ai-command-center-v17";
 const CORE_ASSETS = [
   "./",
   "./index.html",

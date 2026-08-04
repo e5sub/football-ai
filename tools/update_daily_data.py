@@ -93,6 +93,17 @@ def main() -> None:
                     warnings.append(f"{play_type} 玩法赔率请求成功但解析为 0 行")
                 elif not (set(rows_by_fixture) & current_fixture_ids):
                     warnings.append(f"{play_type} 玩法赔率请求成功但与当前赛事 fixture 交集为 0")
+                elif play_type == "bf":
+                    incomplete = 0
+                    for fixture_id in set(rows_by_fixture) & current_fixture_ids:
+                        scores = rows_by_fixture[fixture_id].get("bf", rows_by_fixture[fixture_id])
+                        exact_scores = [tuple(map(int, key.split("-", 1))) for key in scores if re.fullmatch(r"\d{1,2}-\d{1,2}", key)]
+                        has_home = "home-other" in scores or any(home > away for home, away in exact_scores)
+                        has_draw = "draw-other" in scores or any(home == away for home, away in exact_scores)
+                        has_away = "away-other" in scores or any(home < away for home, away in exact_scores)
+                        incomplete += not (has_home and has_draw and has_away)
+                    if incomplete:
+                        warnings.append(f"bf 玩法有 {incomplete} 场未同时解析到胜/平/负比分赔率")
             except Exception as exc:  # noqa: BLE001
                 play_odds_by_type[play_type] = {}
                 warnings.append(f"{play_type} 玩法赔率更新失败：{exc}")
@@ -338,13 +349,20 @@ def parse_current_rows(html: str) -> list[dict[str, Any]]:
 def parse_play_rows(html: str, play_type: str) -> list[dict[str, Any]]:
     """Parse a dedicated 500 play page and return odds keyed by fixture."""
     rows: list[dict[str, Any]] = []
-    pattern = re.compile(r'<tr class="[^\"]*bet-tb-tr[^\"]*"(?P<attrs>[^>]*)>(?P<body>.*?)</tr>', re.I | re.S)
-    for item in pattern.finditer(html or ""):
+    # Score betting renders one fixture across several consecutive table rows:
+    # the first row carries the fixture attributes, while draw and away scores
+    # live in following rows. Parse through the next fixture start so those odds
+    # are not silently discarded.
+    pattern = re.compile(r'<tr class="[^\"]*bet-tb-tr[^\"]*"(?P<attrs>[^>]*)>', re.I)
+    row_starts = list(pattern.finditer(html or ""))
+    matches = [item for item in row_starts if parse_html_attributes(item.group("attrs")).get("data-fixtureid")]
+    for index, item in enumerate(matches):
         attrs = parse_html_attributes(item.group("attrs"))
-        body = item.group("body")
         fixture_id = attrs.get("data-fixtureid", "")
         if not fixture_id:
             continue
+        block_end = matches[index + 1].start() if index + 1 < len(matches) else len(html or "")
+        body = (html or "")[item.end():block_end]
         play_odds = parse_play_odds(body).get(play_type) or {}
         if play_odds:
             rows.append({"fixture_id": fixture_id, "play_odds": {play_type: play_odds}})
