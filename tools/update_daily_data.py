@@ -205,6 +205,9 @@ def main() -> None:
         warnings.append(f"500完整赛事目录更新失败，已保留上一版：{exc}")
 
     archive = update_analysis_archive(old_archive, matches, history, args.history_retention)
+    if old_archive and not archive:
+        warnings.append("分析归档生成结果为空，已保留上一版归档，避免历史回看记录丢失")
+        archive = old_archive
 
     payload = {
         "meta": build_meta(old_payload, matches, history, update_status, warnings),
@@ -268,6 +271,20 @@ def sync_database(datasets: dict[str, dict[str, Any]]) -> dict[str, str]:
         for dataset_key, payload in datasets.items():
             try:
                 record = db.get(DataSnapshot, dataset_key)
+                if dataset_key == "analysis_archive":
+                    current_matches = payload.get("matches") if isinstance(payload, dict) else None
+                    if not isinstance(current_matches, list):
+                        results[dataset_key] = "failed: archive matches must be a list"
+                        continue
+                if dataset_key == "analysis_archive" and record is not None:
+                    previous_matches = (record.payload or {}).get("matches") if isinstance(record.payload, dict) else None
+                    if (
+                        isinstance(previous_matches, list)
+                        and isinstance(current_matches, list)
+                        and len(current_matches) < len(previous_matches)
+                    ):
+                        results[dataset_key] = "preserved: incoming archive is smaller"
+                        continue
                 if record is None:
                     db.add(DataSnapshot(dataset_key=dataset_key, payload=payload))
                 else:
@@ -2512,7 +2529,12 @@ def update_analysis_archive(
     history: list[dict[str, Any]],
     retention_days: int,
 ) -> list[dict[str, Any]]:
-    archive = {str(item.get("id")): dict(item) for item in old_archive if item.get("id")}
+    archive: dict[str, dict[str, Any]] = {}
+    for index, item in enumerate(old_archive):
+        if not isinstance(item, dict):
+            continue
+        item_id = str(item.get("id") or "").strip()
+        archive[item_id or f"legacy:{index}"] = dict(item)
     archive_keys = {canonical_match_key(item) for item in archive.values() if canonical_match_key(item)}
     for match in matches:
         conclusion = match.get("conclusion") or {}
@@ -2602,39 +2624,42 @@ def update_analysis_archive(
         finished_by_teams[key].append(row)
         if row.get("round"):
             finished_by_round[str(row.get("round"))].append(row)
-    cutoff = local_today() - timedelta(days=max(30, retention_days))
     output: list[dict[str, Any]] = []
     for item in archive.values():
+        if not isinstance(item, dict):
+            continue
+        # Analysis review is a durable record. The retention window applies to
+        # profile/history data, not to archived forecasts shown in the UI.
+        match_date = None
         try:
             match_date = datetime.strptime(str(item.get("date") or "")[:10], "%Y-%m-%d").date()
         except ValueError:
-            continue
-        if match_date < cutoff:
-            continue
-        key = f"{normalize_team(item.get('home'))}|{normalize_team(item.get('away'))}"
-        candidates = finished_by_teams.get(key) or []
-        if not candidates and item.get("round"):
-            # The official JC round is stable even when 500 renames a team or league.
-            # Date proximity below prevents the same round number from another week matching.
-            candidates = finished_by_round.get(str(item.get("round"))) or []
-        result = min(
-            candidates,
-            key=lambda row: abs((safe_date(str(row.get("date") or "")) - match_date).days),
-            default=None,
-        )
-        if result and abs((safe_date(str(result.get("date") or "")) - match_date).days) <= 3:
-            home_score = int(result.get("homeScore") or 0)
-            away_score = int(result.get("awayScore") or 0)
-            actual = "主胜" if home_score > away_score else ("客胜" if home_score < away_score else "平局")
-            item["finalScore"] = f"{home_score}-{away_score}"
-            item["actualOutcome"] = actual
-            primary_hit = item.get("predictedPrimary") == actual
-            execution_hit = actual in covered_outcomes(item.get("predictedPrimary"), item.get("cover"))
-            item["primaryHit"] = primary_hit
-            item["executionHit"] = execution_hit
-            item["directionHit"] = execution_hit
-            item["hitType"] = "primary" if primary_hit else ("secondary" if execution_hit else "miss")
-            item["finishedAt"] = result.get("date")
+            pass
+        if match_date:
+            key = f"{normalize_team(item.get('home'))}|{normalize_team(item.get('away'))}"
+            candidates = finished_by_teams.get(key) or []
+            if not candidates and item.get("round"):
+                # The official JC round is stable even when 500 renames a team or league.
+                # Date proximity below prevents the same round number from another week matching.
+                candidates = finished_by_round.get(str(item.get("round"))) or []
+            result = min(
+                candidates,
+                key=lambda row: abs((safe_date(str(row.get("date") or "")) - match_date).days),
+                default=None,
+            )
+            if result and abs((safe_date(str(result.get("date") or "")) - match_date).days) <= 3:
+                home_score = int(result.get("homeScore") or 0)
+                away_score = int(result.get("awayScore") or 0)
+                actual = "主胜" if home_score > away_score else ("客胜" if home_score < away_score else "平局")
+                item["finalScore"] = f"{home_score}-{away_score}"
+                item["actualOutcome"] = actual
+                primary_hit = item.get("predictedPrimary") == actual
+                execution_hit = actual in covered_outcomes(item.get("predictedPrimary"), item.get("cover"))
+                item["primaryHit"] = primary_hit
+                item["executionHit"] = execution_hit
+                item["directionHit"] = execution_hit
+                item["hitType"] = "primary" if primary_hit else ("secondary" if execution_hit else "miss")
+                item["finishedAt"] = result.get("date")
         output.append(item)
     return sorted(output, key=lambda item: str(item.get("date") or ""), reverse=True)
 
@@ -2755,8 +2780,17 @@ def load_json(path: Path, default: Any) -> Any:
 
 
 def write_json(path: Path, value: Any) -> None:
+    """Write a complete JSON snapshot before replacing the live file."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary = path.with_name(f".{path.name}.tmp")
+    try:
+        temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        os.replace(temporary, path)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
 
 
 if __name__ == "__main__":

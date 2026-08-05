@@ -231,7 +231,22 @@ def import_json_snapshots() -> dict[str, str]:
         for dataset_key, path in JSON_SNAPSHOT_FILES.items():
             try:
                 payload = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(payload, dict):
+                    raise ValueError("快照必须是 JSON 对象")
                 record = db.get(DataSnapshot, dataset_key)
+                if dataset_key == "analysis_archive" and not isinstance(payload.get("matches"), list):
+                    results[dataset_key] = "failed: archive matches must be a list"
+                    continue
+                if dataset_key == "analysis_archive" and record is not None:
+                    previous_matches = record.payload.get("matches") if isinstance(record.payload, dict) else None
+                    incoming_matches = payload.get("matches")
+                    if (
+                        isinstance(previous_matches, list)
+                        and isinstance(incoming_matches, list)
+                        and len(incoming_matches) < len(previous_matches)
+                    ):
+                        results[dataset_key] = "preserved: incoming archive is smaller"
+                        continue
                 if record is None:
                     db.add(DataSnapshot(dataset_key=dataset_key, payload=payload))
                 else:
@@ -603,10 +618,11 @@ def data_analysis_archive(response: Response, db: Session = Depends(db_session))
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     snapshot = db.get(DataSnapshot, "analysis_archive")
-    if snapshot:
+    if snapshot and isinstance(snapshot.payload, dict) and isinstance(snapshot.payload.get("matches"), list):
         return snapshot.payload
     try:
-        return json.loads((ROOT / "data" / "analysis_archive.json").read_text(encoding="utf-8"))
+        payload = json.loads((ROOT / "data" / "analysis_archive.json").read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) and isinstance(payload.get("matches"), list) else {"matches": []}
     except (OSError, json.JSONDecodeError):
         return {"matches": []}
 

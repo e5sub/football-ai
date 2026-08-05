@@ -844,7 +844,7 @@
     const DATA_CACHE_KEY = "football_ai_remote_data_cache_v3";
     const ARCHIVE_CACHE_KEY = "football_ai_archive_cache_v2";
     const LIVE_REFRESH_INTERVAL = 60 * 1000;
-    const state = { data: FALLBACK_DATA, matches: [], manualMatches: [], fixtureCatalog: null, catalogPromise: null, activeId: "", archive: [], archiveLoaded: false, authToken: localStorage.getItem("football_ai_session") || "", user: null, adminToken: localStorage.getItem("football_ai_admin_session") || "", csrfToken: "" };
+    const state = { data: FALLBACK_DATA, matches: [], manualMatches: [], fixtureCatalog: null, catalogPromise: null, activeId: "", archive: [], archiveLoaded: false, archiveNotice: "", authToken: localStorage.getItem("football_ai_session") || "", user: null, adminToken: localStorage.getItem("football_ai_admin_session") || "", csrfToken: "" };
 
     const $ = (id) => document.getElementById(id);
     const pct = (value) => `${Math.round((Number(value) || 0) * 1000) / 10}%`;
@@ -1454,30 +1454,71 @@
       document.body.classList.remove("history-open");
     }
 
+    function archiveRowKey(item, index) {
+      if (item?.canonicalMatchKey) return `key:${item.canonicalMatchKey}`;
+      if (item?.fixtureId) return `fixture:${item.fixtureId}`;
+      if (item?.id) return `id:${item.id}`;
+      return `legacy:${item?.date || ""}:${item?.home || ""}:${item?.away || ""}:${index}`;
+    }
+
+    function mergeArchiveRows(existing, incoming) {
+      const merged = [];
+      const positions = new Map();
+      for (const [index, item] of [...existing, ...incoming].entries()) {
+        if (!item || typeof item !== "object") continue;
+        const key = archiveRowKey(item, index);
+        const position = positions.get(key);
+        if (position === undefined) {
+          positions.set(key, merged.length);
+          merged.push(item);
+        } else {
+          merged[position] = {...merged[position], ...item};
+        }
+      }
+      return merged;
+    }
+
     async function loadHistoryArchive() {
       $("historyMeta").textContent = "历史记录载入中...";
       const cached = readCachedJson(ARCHIVE_CACHE_KEY);
+      const cachedRows = Array.isArray(cached?.matches) ? cached.matches : [];
+      state.archiveNotice = "";
       try {
         const payload = await fetchJsonWithTimeout("/api/data/analysis-archive", 7000);
-        state.archive = Array.isArray(payload.matches) ? payload.matches : [];
-        writeCachedJson(ARCHIVE_CACHE_KEY, payload);
+        if (!payload || !Array.isArray(payload.matches)) throw new Error("历史归档格式无效");
+        if (payload.matches.length === 0 && cachedRows.length > 0) {
+          state.archive = cachedRows;
+          state.archiveNotice = "历史接口返回空数据，已保留本地历史缓存";
+        } else {
+          state.archive = mergeArchiveRows(cachedRows, payload.matches);
+          if (state.archive.length > payload.matches.length) {
+            state.archiveNotice = "接口归档缺少部分记录，已从本地历史缓存补全";
+          }
+          writeCachedJson(ARCHIVE_CACHE_KEY, {...payload, matches: state.archive});
+        }
       } catch (error) {
-        state.archive = Array.isArray(cached?.matches) ? cached.matches : state.matches.map(match => ({
-          id: match.id, date: match.date, round: match.round, league: match.league, home: match.home, away: match.away,
-          predictedPrimary: match.conclusion?.primary || "--", cover: match.conclusion?.cover || "--",
-          confidence: match.conclusion?.confidence || 0, bestScores: match.conclusion?.bestScores || [],
-          recommendationTier: matchRecommendationTier(match), portfolioEligible: matchRecommendationTier(match) === "重点",
-          coldScores: match.conclusion?.coldScores || [], overUnder: match.conclusion?.overUnder || "--",
-          trackingStatus: match.analysisTracking?.status || "legacy",
-          initialAnalysis: match.analysisTracking?.initial || null,
-          latestAnalysis: match.analysisTracking?.latest || null,
-          lockedAnalysis: match.analysisTracking?.lockedSnapshot || null,
-          analysisTimeline: match.analysisTracking?.snapshots || [],
-          oddsInitial: match.odds?.initial || {}, oddsLatest: match.odds?.current || {},
-          oddsMovement: match.odds?.movementCombo || match.odds?.movement || "",
-          changeReason: match.analysisTracking?.change?.reason || "",
-          finalScore: "", actualOutcome: "", primaryHit: null, executionHit: null, directionHit: null, hitType: ""
-        }));
+        if (cachedRows.length > 0) {
+          state.archive = cachedRows;
+          state.archiveNotice = "历史接口暂不可用，当前显示本地历史缓存";
+        } else {
+          state.archive = state.matches.map(match => ({
+            id: match.id, date: match.date, round: match.round, league: match.league, home: match.home, away: match.away,
+            predictedPrimary: match.conclusion?.primary || "--", cover: match.conclusion?.cover || "--",
+            confidence: match.conclusion?.confidence || 0, bestScores: match.conclusion?.bestScores || [],
+            recommendationTier: matchRecommendationTier(match), portfolioEligible: matchRecommendationTier(match) === "重点",
+            coldScores: match.conclusion?.coldScores || [], overUnder: match.conclusion?.overUnder || "--",
+            trackingStatus: match.analysisTracking?.status || "legacy",
+            initialAnalysis: match.analysisTracking?.initial || null,
+            latestAnalysis: match.analysisTracking?.latest || null,
+            lockedAnalysis: match.analysisTracking?.lockedSnapshot || null,
+            analysisTimeline: match.analysisTracking?.snapshots || [],
+            oddsInitial: match.odds?.initial || {}, oddsLatest: match.odds?.current || {},
+            oddsMovement: match.odds?.movementCombo || match.odds?.movement || "",
+            changeReason: match.analysisTracking?.change?.reason || "",
+            finalScore: "", actualOutcome: "", primaryHit: null, executionHit: null, directionHit: null, hitType: ""
+          }));
+          state.archiveNotice = "历史接口暂不可用，仅显示当前赛事临时数据";
+        }
       }
       state.archiveLoaded = true;
     }
@@ -1540,7 +1581,8 @@
       const primaryHits = finishedRows.filter(item => item.primaryHit ?? (item.actualOutcome && item.predictedPrimary === item.actualOutcome)).length;
       const focusRows = finishedRows.filter(item => item.recommendationTier === "重点" || item.portfolioEligible === true);
       const focusHits = focusRows.filter(item => (item.executionHit ?? item.directionHit) === true).length;
-      $("historyMeta").textContent = `${rows.length}条记录 · 已出赛果${finishedRows.length}场${focusRows.length ? ` · 重点执行${focusRows.length}场命中${pct(focusHits / focusRows.length)}` : " · 新分层待积累赛果"}${finishedRows.length ? ` · 全部执行${pct(executionHits / finishedRows.length)} · 主判${pct(primaryHits / finishedRows.length)}` : ""}`;
+      const archiveNotice = state.archiveNotice ? `${state.archiveNotice} · ` : "";
+      $("historyMeta").textContent = `${archiveNotice}${rows.length}条记录 · 已出赛果${finishedRows.length}场${focusRows.length ? ` · 重点执行${focusRows.length}场命中${pct(focusHits / focusRows.length)}` : " · 新分层待积累赛果"}${finishedRows.length ? ` · 全部执行${pct(executionHits / finishedRows.length)} · 主判${pct(primaryHits / finishedRows.length)}` : ""}`;
       $("historyList").innerHTML = rows.length ? rows.map(item => {
         const executionHit = item.executionHit ?? item.directionHit;
         const primaryHit = item.primaryHit ?? (item.actualOutcome ? item.predictedPrimary === item.actualOutcome : null);
