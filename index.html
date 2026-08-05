@@ -975,10 +975,8 @@
     }
 
     function openCalculator() {
-      const url = "https://m.sporttery.cn/mjc/jsq/zqspf/";
-      const popup = window.open(url, "_blank", "noopener,noreferrer");
-      if (popup) return;
-      location.href = url;
+      const popup = window.open("https://m.sporttery.cn/mjc/jsq/zqspf/", "_blank");
+      if (popup) popup.opener = null;
     }
 
     function openBetRecorder() {
