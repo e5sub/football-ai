@@ -24,6 +24,14 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, create_engine, func, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
+from backend.data_update_schedule import (
+    DATA_UPDATE_TIMEZONE,
+    DEFAULT_DATA_UPDATE_TIMES,
+    format_update_times,
+    next_update_at,
+    parse_update_times,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 try:
     from dotenv import load_dotenv
@@ -198,12 +206,15 @@ DATA_UPDATE_LOCK = threading.Lock()
 DATA_UPDATE_STATUS_LOCK = threading.Lock()
 DATA_UPDATE_LOG = ROOT / "logs" / "data_update.log"
 DATA_UPDATE_STATUS = {"running": False, "message": "", "output": "", "started_at": None, "finished_at": None, "duration_seconds": None}
+DATA_UPDATE_TIMES_ERROR = ""
 try:
-    DATA_UPDATE_INTERVAL_HOURS = max(1, int(os.getenv("DATA_UPDATE_INTERVAL_HOURS", "2")))
-except ValueError:
-    DATA_UPDATE_INTERVAL_HOURS = 2
+    DATA_UPDATE_TIMES = parse_update_times(os.getenv("DATA_UPDATE_TIMES", DEFAULT_DATA_UPDATE_TIMES))
+except ValueError as exc:
+    DATA_UPDATE_TIMES = parse_update_times(DEFAULT_DATA_UPDATE_TIMES)
+    DATA_UPDATE_TIMES_ERROR = str(exc)
 DATA_UPDATE_STOP_EVENT = threading.Event()
 DATA_UPDATE_SCHEDULER_STARTED = False
+DATA_UPDATE_SCHEDULER_THREAD: threading.Thread | None = None
 JSON_SNAPSHOT_FILES = {
     "matches": ROOT / "data" / "matches.json",
     "history": ROOT / "data" / "jc_history.json",
@@ -857,27 +868,41 @@ def start_data_update(trigger: str) -> bool:
 
 
 def data_update_scheduler() -> None:
-    """Run the updater at a fixed interval without overlapping manual jobs."""
-    interval_seconds = DATA_UPDATE_INTERVAL_HOURS * 3600
-    while not DATA_UPDATE_STOP_EVENT.wait(interval_seconds):
-        if not start_data_update(f"每 {DATA_UPDATE_INTERVAL_HOURS} 小时自动更新"):
-            write_update_log("自动更新跳过：已有赛事数据更新任务正在进行")
+    """Run the updater at fixed Asia/Shanghai wall-clock times."""
+    while not DATA_UPDATE_STOP_EVENT.is_set():
+        current = datetime.now(DATA_UPDATE_TIMEZONE)
+        scheduled_at = next_update_at(current, DATA_UPDATE_TIMES)
+        delay = max(0.0, (scheduled_at - current).total_seconds())
+        if DATA_UPDATE_STOP_EVENT.wait(delay):
+            break
+        trigger = f"北京时间 {scheduled_at:%Y-%m-%d %H:%M} 自动更新"
+        if not start_data_update(trigger):
+            write_update_log(f"自动更新跳过：已有赛事数据更新任务正在进行（{trigger}）")
 
 
 @app.on_event("startup")
 def start_data_update_scheduler() -> None:
-    global DATA_UPDATE_SCHEDULER_STARTED
+    global DATA_UPDATE_SCHEDULER_STARTED, DATA_UPDATE_SCHEDULER_THREAD
     if DATA_UPDATE_SCHEDULER_STARTED:
         return
     DATA_UPDATE_SCHEDULER_STARTED = True
     DATA_UPDATE_STOP_EVENT.clear()
-    threading.Thread(target=data_update_scheduler, name="data-update-scheduler", daemon=True).start()
-    write_update_log(f"赛事数据自动更新已启用：每 {DATA_UPDATE_INTERVAL_HOURS} 小时执行一次")
+    DATA_UPDATE_SCHEDULER_THREAD = threading.Thread(target=data_update_scheduler, name="data-update-scheduler", daemon=True)
+    DATA_UPDATE_SCHEDULER_THREAD.start()
+    schedule_text = format_update_times(DATA_UPDATE_TIMES)
+    write_update_log(f"赛事数据自动更新已启用：每天北京时间 {schedule_text}")
+    if DATA_UPDATE_TIMES_ERROR:
+        write_update_log(f"DATA_UPDATE_TIMES 配置无效，已使用默认时间表：{DATA_UPDATE_TIMES_ERROR}")
 
 
 @app.on_event("shutdown")
 def stop_data_update_scheduler() -> None:
+    global DATA_UPDATE_SCHEDULER_STARTED, DATA_UPDATE_SCHEDULER_THREAD
     DATA_UPDATE_STOP_EVENT.set()
+    if DATA_UPDATE_SCHEDULER_THREAD:
+        DATA_UPDATE_SCHEDULER_THREAD.join(timeout=2)
+    DATA_UPDATE_SCHEDULER_THREAD = None
+    DATA_UPDATE_SCHEDULER_STARTED = False
 
 
 def run_data_update() -> None:
