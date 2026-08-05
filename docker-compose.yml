@@ -1,17 +1,17 @@
 services:
   app:
-    image: ${IMAGE_NAME:-ghcr.io/your-org/ai-football:latest}
-    container_name: football-ai
+    image: ghcr.io/e5sub/ai-football:latest
+    container_name: ai-football
+    network_mode: host
     environment:
-      TZ: Asia/Shanghai
-      DATABASE_URL: ${DATABASE_URL:?请在 .env 中配置外部 MySQL DATABASE_URL}
-      SESSION_DAYS: ${SESSION_DAYS:-365}
-      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-}
-      COOKIE_SECURE: ${COOKIE_SECURE:-0}
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
-      DATA_UPDATE_INTERVAL_HOURS: ${DATA_UPDATE_INTERVAL_HOURS:-2}
-    ports:
-      - "8000:8000"
+      - DATABASE_URL=mysql+pymysql://football:football@127.0.0.1:3306/football?charset=utf8mb4
+      - SESSION_DAYS=365
+      - PUBLIC_BASE_URL=http://localhost:8000
+      - TZ=Asia/Shanghai
+      - AUTH_SECRET_KEY=123456789（自己修改）
+      - COOKIE_SECURE=1
+      - DATA_UPDATE_INTERVAL_HOURS=2
+      - TZ=Asia/Shanghai
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
