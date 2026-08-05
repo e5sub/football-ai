@@ -66,16 +66,17 @@ def load_previous_matches_payload(json_path: Path) -> tuple[dict[str, Any], str]
     The API serves database snapshots before JSON files, so building new
     analysis tracking against the container's JSON would discard the live
     version chain whenever Docker rebuilt the image. When DATABASE_URL is set,
-    prefer the database snapshot; fall back to the JSON file otherwise.
+    prefer the database snapshot; use JSON only when the database has no row.
+    Database errors are fatal so a live version chain cannot be reset silently.
     """
     if os.getenv("DATABASE_URL"):
         try:
             payload = load_dataset_snapshot("matches")
-            if payload:
-                return payload, "database"
-        except Exception:  # noqa: BLE001
-            pass
-    return load_json(json_path, {}), "json"
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"读取数据库 matches 快照失败，已停止更新以保护历史版本链：{exc}") from exc
+        if payload is not None:
+            return validate_dataset_payload(payload, "matches"), "database"
+    return validate_dataset_payload(load_json(json_path, {"matches": []}), "matches"), "json-bootstrap"
 
 
 def load_previous_matches_list(json_path: Path, dataset_key: str) -> tuple[list[dict[str, Any]], str]:
@@ -83,18 +84,31 @@ def load_previous_matches_list(json_path: Path, dataset_key: str) -> tuple[list[
     if os.getenv("DATABASE_URL"):
         try:
             payload = load_dataset_snapshot(dataset_key)
-            if isinstance(payload, dict) and isinstance(payload.get("matches"), list):
-                return payload["matches"], "database"
-        except Exception:  # noqa: BLE001
-            pass
-    return (load_json(json_path, {"matches": []}).get("matches") or []), "json"
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"读取数据库 {dataset_key} 快照失败，已停止更新以保护历史版本链：{exc}") from exc
+        if payload is not None:
+            validated = validate_dataset_payload(payload, dataset_key)
+            return validated["matches"], "database"
+    payload = validate_dataset_payload(load_json(json_path, {"matches": []}), dataset_key)
+    return payload["matches"], "json-bootstrap"
+
+
+def validate_dataset_payload(payload: Any, dataset_key: str) -> dict[str, Any]:
+    """Reject malformed snapshots before they can reset the analysis timeline."""
+    if not isinstance(payload, dict):
+        raise ValueError(f"{dataset_key} 快照顶层必须是 JSON 对象")
+    if not isinstance(payload.get("matches"), list):
+        raise ValueError(f"{dataset_key} 快照的 matches 必须是数组")
+    return payload
 
 
 def load_dataset_snapshot(dataset_key: str) -> dict[str, Any] | None:
     """Return a stored dataset payload from the database without importing app state."""
     try:
         from sqlalchemy import create_engine, text
-    except ImportError:
+    except ImportError as exc:
+        if os.getenv("DATABASE_URL"):
+            raise RuntimeError("已配置 DATABASE_URL，但 SQLAlchemy 不可用") from exc
         return None
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
@@ -106,7 +120,19 @@ def load_dataset_snapshot(dataset_key: str) -> dict[str, Any] | None:
                 text("SELECT payload FROM data_snapshots WHERE dataset_key = :key"),
                 {"key": dataset_key},
             ).first()
-        return dict(row[0]) if row and row[0] else None
+        if not row or row[0] is None:
+            return None
+        payload = row[0]
+        if isinstance(payload, (bytes, bytearray)):
+            payload = payload.decode("utf-8")
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"数据库 {dataset_key} 快照不是有效 JSON：{exc}") from exc
+        if not isinstance(payload, dict):
+            raise ValueError(f"数据库 {dataset_key} 快照顶层必须是 JSON 对象")
+        return payload
     finally:
         engine.dispose()
 
@@ -119,8 +145,8 @@ def main() -> None:
 
     old_payload, previous_source = load_previous_matches_payload(DATA_PATH)
     seed_profiles = normalize_seed_profiles(old_payload.get("seedLeagueProfiles") or old_payload.get("leagueProfiles") or [])
-    old_history, _ = load_previous_matches_list(HISTORY_PATH, "history")
-    old_archive, _ = load_previous_matches_list(ARCHIVE_PATH, "analysis_archive")
+    old_history, history_source = load_previous_matches_list(HISTORY_PATH, "history")
+    old_archive, archive_source = load_previous_matches_list(ARCHIVE_PATH, "analysis_archive")
     old_catalog = load_json(FIXTURE_CATALOG_PATH, {"matches": []})
     today = local_today()
 
@@ -249,7 +275,23 @@ def main() -> None:
             play_type: sum(bool(((match.get("odds") or {}).get("plays") or {}).get(play_type)) for match in matches)
             for play_type in ("spf", "rqspf", "bf", "zjq", "bqc")
         },
+        "jsonBackup": {
+            "matches": "success",
+            "history": "success",
+            "analysisArchive": "success",
+            "fixtureCatalog": "success",
+        },
         "database": database_status,
+        "previousSources": {
+            "matches": previous_source,
+            "history": history_source,
+            "analysisArchive": archive_source,
+        },
+        "previousCounts": {
+            "matches": len(old_payload["matches"]),
+            "history": len(old_history),
+            "analysisArchive": len(old_archive),
+        },
         "warnings": warnings[:5],
     }
     print(json.dumps(summary, ensure_ascii=False))
