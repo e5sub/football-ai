@@ -112,5 +112,115 @@ class AnalysisTrackingTests(unittest.TestCase):
         self.assertEqual(previous["analysisTracking"]["latest"]["stage"], "latest")
 
 
+class AnalysisArchiveDeduplicationTests(unittest.TestCase):
+    def archive_row(self, row_id, fixture_id, kickoff="2026-08-06 02:00:00", **extra):
+        row = {
+            "id": row_id,
+            "fixtureId": fixture_id,
+            "canonicalMatchKey": f"f:{fixture_id}",
+            "date": kickoff,
+            "home": "费内巴切",
+            "away": "格风暴",
+            "confidence": 48,
+            "analysisTimeline": [],
+        }
+        row.update(extra)
+        return row
+
+    def test_same_teams_and_exact_kickoff_collapse_changed_ids(self):
+        old = self.archive_row(
+            "old-id", "old-fixture", finalScore="2-1", actualOutcome="主胜",
+            analysisTimeline=[{"at": "2026-08-05T08:00:00+08:00", "stage": "initial", "primary": "客胜"}],
+        )
+        fresh = self.archive_row(
+            "new-id", "new-fixture", confidence=66,
+            analysisTimeline=[{"at": "2026-08-05T09:00:00+08:00", "stage": "latest", "primary": "主胜"}],
+        )
+
+        rows = updater.deduplicate_archive_rows([old, fresh])
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["confidence"], 66)
+        self.assertEqual(rows[0]["finalScore"], "2-1")
+        self.assertEqual(len(rows[0]["analysisTimeline"]), 2)
+
+    def test_different_kickoff_times_are_not_merged(self):
+        first = self.archive_row("first", "fixture-1")
+        second = self.archive_row("second", "fixture-2", kickoff="2026-08-06 04:00:00")
+
+        self.assertEqual(len(updater.deduplicate_archive_rows([first, second])), 2)
+
+    def test_deduplication_is_idempotent(self):
+        rows = [
+            self.archive_row("old-id", "old-fixture"),
+            self.archive_row("new-id", "new-fixture", confidence=82),
+        ]
+        once = updater.deduplicate_archive_rows(rows)
+        twice = updater.deduplicate_archive_rows(once)
+
+        self.assertEqual(once, twice)
+
+
+class ArchiveDatabaseProtectionTests(unittest.TestCase):
+    def test_sync_allows_archive_shrink_when_only_duplicates_are_removed(self):
+        previous = [
+            {"id": "old", "date": "2026-08-06 02:00:00", "home": "主队", "away": "客队"},
+            {"id": "new", "fixtureId": "123", "date": "2026-08-06 02:00:00", "home": "主队", "away": "客队"},
+        ]
+        incoming = [
+            {"id": "new", "fixtureId": "123", "date": "2026-08-06 02:00:00", "home": "主队", "away": "客队"},
+        ]
+        record = type("Record", (), {"payload": {"matches": previous}, "updated_at": None})()
+
+        class FakeSession:
+            def get(self, model, key):
+                return record
+
+            def add(self, value):
+                raise AssertionError("existing snapshot should be updated")
+
+            def commit(self):
+                pass
+
+            def rollback(self):
+                pass
+
+            def close(self):
+                pass
+
+        with patch("backend.main.SessionLocal", return_value=FakeSession()):
+            result = updater.sync_database({"analysis_archive": {"matches": incoming}})
+
+        self.assertEqual(result["analysis_archive"], "success")
+        self.assertEqual(record.payload["matches"], incoming)
+
+    def test_sync_preserves_archive_when_a_fixture_is_missing(self):
+        previous = [
+            {"id": "one", "date": "2026-08-06 02:00:00", "home": "甲", "away": "乙"},
+            {"id": "two", "date": "2026-08-07 02:00:00", "home": "丙", "away": "丁"},
+        ]
+        incoming = [previous[0]]
+        record = type("Record", (), {"payload": {"matches": previous}, "updated_at": None})()
+
+        class FakeSession:
+            def get(self, model, key):
+                return record
+
+            def commit(self):
+                raise AssertionError("missing archive must not be committed")
+
+            def rollback(self):
+                pass
+
+            def close(self):
+                pass
+
+        with patch("backend.main.SessionLocal", return_value=FakeSession()):
+            result = updater.sync_database({"analysis_archive": {"matches": incoming}})
+
+        self.assertEqual(result["analysis_archive"], "preserved: incoming archive is missing fixtures")
+        self.assertEqual(record.payload["matches"], previous)
+
+
 if __name__ == "__main__":
     unittest.main()

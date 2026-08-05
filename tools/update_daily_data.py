@@ -7,6 +7,7 @@ import json
 import math
 import os
 import re
+import sys
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -21,6 +22,10 @@ from zoneinfo import ZoneInfo
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from backend.archive_identity import archive_covers_previous, archive_records_match
 try:
     from dotenv import load_dotenv
 
@@ -323,9 +328,9 @@ def sync_database(datasets: dict[str, dict[str, Any]]) -> dict[str, str]:
                     if (
                         isinstance(previous_matches, list)
                         and isinstance(current_matches, list)
-                        and len(current_matches) < len(previous_matches)
+                        and not archive_covers_previous(previous_matches, current_matches)
                     ):
-                        results[dataset_key] = "preserved: incoming archive is smaller"
+                        results[dataset_key] = "preserved: incoming archive is missing fixtures"
                         continue
                 if record is None:
                     db.add(DataSnapshot(dataset_key=dataset_key, payload=payload))
@@ -2565,6 +2570,43 @@ def covered_outcomes(predicted_primary: Any, cover: Any) -> set[str]:
     return outcomes
 
 
+def merge_archive_record(previous: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
+    """Merge two records that have been proven to describe the same fixture."""
+    merged = copy.deepcopy(previous)
+    for key, value in incoming.items():
+        if value not in (None, "", [], {}):
+            merged[key] = copy.deepcopy(value)
+    for key in ("finalScore", "actualOutcome", "primaryHit", "executionHit", "directionHit", "hitType"):
+        if previous.get(key) not in (None, "") and incoming.get(key) in (None, ""):
+            merged[key] = previous[key]
+    if previous.get("createdAt") and incoming.get("createdAt"):
+        merged["createdAt"] = min(str(previous["createdAt"]), str(incoming["createdAt"]))
+    if previous.get("updatedAt") and incoming.get("updatedAt"):
+        merged["updatedAt"] = max(str(previous["updatedAt"]), str(incoming["updatedAt"]))
+    merged["analysisTimeline"] = merge_analysis_timelines(
+        previous.get("analysisTimeline"), incoming.get("analysisTimeline")
+    )
+    return merged
+
+
+def deduplicate_archive_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Collapse all historical aliases while preserving the complete record."""
+    unique: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        matches = [index for index, existing in enumerate(unique) if archive_records_match(existing, row)]
+        if not matches:
+            unique.append(copy.deepcopy(row))
+            continue
+        primary = matches[0]
+        unique[primary] = merge_archive_record(unique[primary], row)
+        for duplicate in reversed(matches[1:]):
+            unique[primary] = merge_archive_record(unique[primary], unique[duplicate])
+            unique.pop(duplicate)
+    return unique
+
+
 def update_analysis_archive(
     old_archive: list[dict[str, Any]],
     matches: list[dict[str, Any]],
@@ -2572,9 +2614,7 @@ def update_analysis_archive(
     retention_days: int,
 ) -> list[dict[str, Any]]:
     archive: dict[str, dict[str, Any]] = {}
-    for index, item in enumerate(old_archive):
-        if not isinstance(item, dict):
-            continue
+    for index, item in enumerate(deduplicate_archive_rows(old_archive)):
         item_id = str(item.get("id") or "").strip()
         archive[item_id or f"legacy:{index}"] = dict(item)
     archive_keys = {canonical_match_key(item) for item in archive.values() if canonical_match_key(item)}
@@ -2594,12 +2634,7 @@ def update_analysis_archive(
             )
         if not duplicate_id:
             duplicate_id = next(
-                (
-                    item_id for item_id, item in archive.items()
-                    if str(item.get("date") or "")[:10] == str(match.get("date") or "")[:10]
-                    and normalize_team(item.get("home")) == normalize_team(match.get("home"))
-                    and normalize_team(item.get("away")) == normalize_team(match.get("away"))
-                ),
+                (item_id for item_id, item in archive.items() if archive_records_match(item, match)),
                 None,
             )
         match_is_provisional = bool(re.fullmatch(r"500-周.\d{3}", match_id))
@@ -2703,6 +2738,7 @@ def update_analysis_archive(
                 item["hitType"] = "primary" if primary_hit else ("secondary" if execution_hit else "miss")
                 item["finishedAt"] = result.get("date")
         output.append(item)
+    output = deduplicate_archive_rows(output)
     return sorted(output, key=lambda item: str(item.get("date") or ""), reverse=True)
 
 

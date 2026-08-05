@@ -1449,26 +1449,68 @@
       document.body.classList.remove("history-open");
     }
 
-    function archiveRowKey(item, index) {
-      if (item?.canonicalMatchKey) return `key:${item.canonicalMatchKey}`;
-      if (item?.fixtureId) return `fixture:${item.fixtureId}`;
-      if (item?.id) return `id:${item.id}`;
-      return `legacy:${item?.date || ""}:${item?.home || ""}:${item?.away || ""}:${index}`;
+    function archiveTeamKey(value) {
+      return String(value || "").toLowerCase().replace(/[\s·.\-（）()\[\]]+/g, "");
+    }
+
+    function archiveKickoffKey(value) {
+      const text = String(value || "").trim().replace(" ", "T");
+      const match = text.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/);
+      return match ? match[1] : "";
+    }
+
+    function archiveRowKeys(item) {
+      if (!item || typeof item !== "object") return [];
+      const keys = [];
+      if (item.canonicalMatchKey) keys.push(`canonical:${item.canonicalMatchKey}`);
+      if (item.fixtureId) keys.push(`fixture:${item.fixtureId}`);
+      if (item.id && !/^500-周.\d{3}$/.test(String(item.id))) keys.push(`id:${item.id}`);
+      const kickoff = archiveKickoffKey(item.date);
+      const home = archiveTeamKey(item.home);
+      const away = archiveTeamKey(item.away);
+      if (kickoff && home && away) keys.push(`kickoff:${kickoff}:${home}:${away}`);
+      return keys;
+    }
+
+    function mergeArchiveRecord(previous, incoming) {
+      const merged = {...previous};
+      for (const [key, value] of Object.entries(incoming || {})) {
+        if (value !== null && value !== "" && value !== undefined && !(Array.isArray(value) && value.length === 0)) merged[key] = value;
+      }
+      for (const key of ["finalScore", "actualOutcome", "primaryHit", "executionHit", "directionHit", "hitType"]) {
+        if (previous?.[key] !== null && previous?.[key] !== undefined && previous?.[key] !== "" && (incoming?.[key] === null || incoming?.[key] === undefined || incoming?.[key] === "")) merged[key] = previous[key];
+      }
+      const timelines = [...(previous?.analysisTimeline || []), ...(incoming?.analysisTimeline || [])];
+      merged.analysisTimeline = timelines.filter((item, index, rows) => {
+        const signature = JSON.stringify([item?.at, item?.stage, item?.primary, item?.candidatePrimary, item?.cover, item?.odds || {}]);
+        return rows.findIndex(candidate => JSON.stringify([candidate?.at, candidate?.stage, candidate?.primary, candidate?.candidatePrimary, candidate?.cover, candidate?.odds || {}]) === signature) === index;
+      });
+      return merged;
     }
 
     function mergeArchiveRows(existing, incoming) {
       const merged = [];
-      const positions = new Map();
-      for (const [index, item] of [...existing, ...incoming].entries()) {
+      const aliases = new Map();
+      for (const item of [...existing, ...incoming]) {
         if (!item || typeof item !== "object") continue;
-        const key = archiveRowKey(item, index);
-        const position = positions.get(key);
+        const keys = archiveRowKeys(item);
+        const matches = [...new Set(keys.map(key => aliases.get(key)).filter(value => value !== undefined))].sort((a, b) => a - b);
+        let position = matches[0];
         if (position === undefined) {
-          positions.set(key, merged.length);
+          position = merged.length;
           merged.push(item);
         } else {
-          merged[position] = {...merged[position], ...item};
+          merged[position] = mergeArchiveRecord(merged[position], item);
+          for (const duplicatePosition of matches.slice(1).sort((a, b) => b - a)) {
+            merged[position] = mergeArchiveRecord(merged[position], merged[duplicatePosition]);
+            merged.splice(duplicatePosition, 1);
+            for (const [alias, mappedPosition] of aliases) {
+              if (mappedPosition === duplicatePosition) aliases.set(alias, position);
+              else if (mappedPosition > duplicatePosition) aliases.set(alias, mappedPosition - 1);
+            }
+          }
         }
+        for (const key of keys) aliases.set(key, position);
       }
       return merged;
     }
@@ -1476,13 +1518,14 @@
     async function loadHistoryArchive() {
       $("historyMeta").textContent = "历史记录载入中...";
       const cached = readCachedJson(ARCHIVE_CACHE_KEY);
-      const cachedRows = Array.isArray(cached?.matches) ? cached.matches : [];
+      const cachedRows = mergeArchiveRows([], Array.isArray(cached?.matches) ? cached.matches : []);
       state.archiveNotice = "";
       try {
         const payload = await fetchJsonWithTimeout("/api/data/analysis-archive", 7000);
         if (!payload || !Array.isArray(payload.matches)) throw new Error("历史归档格式无效");
         if (payload.matches.length === 0 && cachedRows.length > 0) {
           state.archive = cachedRows;
+          writeCachedJson(ARCHIVE_CACHE_KEY, {...cached, matches: cachedRows});
           state.archiveNotice = "历史接口返回空数据，已保留本地历史缓存";
         } else {
           state.archive = mergeArchiveRows(cachedRows, payload.matches);

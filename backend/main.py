@@ -24,6 +24,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, create_engine, func, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
+from backend.archive_identity import archive_covers_previous
 from backend.data_update_schedule import (
     DATA_UPDATE_TIMEZONE,
     DEFAULT_DATA_UPDATE_TIMES,
@@ -254,9 +255,9 @@ def import_json_snapshots() -> dict[str, str]:
                     if (
                         isinstance(previous_matches, list)
                         and isinstance(incoming_matches, list)
-                        and len(incoming_matches) < len(previous_matches)
+                        and not archive_covers_previous(previous_matches, incoming_matches)
                     ):
-                        results[dataset_key] = "preserved: incoming archive is smaller"
+                        results[dataset_key] = "preserved: incoming archive is missing fixtures"
                         continue
                 if record is None:
                     db.add(DataSnapshot(dataset_key=dataset_key, payload=payload))
