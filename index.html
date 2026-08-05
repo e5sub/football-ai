@@ -1362,13 +1362,10 @@
         const candidateText = item.candidatePrimary && item.candidatePrimary !== item.primary
           ? ` · 候选${escapeHtml(item.candidatePrimary)}未通过`
           : "";
-        const routineTag = item.stage === "latest" && !item.meaningful
-          ? ` · <span style="color:var(--text-secondary)">例行复核</span>`
-          : "";
         return `
           <div class="track-row">
             <time>${escapeHtml(formatDateTime(item.at))}</time>
-            <b>${escapeHtml(stageLabels[item.stage] || "快照")} · ${escapeHtml(item.primary || "--")}${candidateText}${routineTag}</b>
+            <b>${escapeHtml(stageLabels[item.stage] || "快照")} · ${escapeHtml(item.primary || "--")}${candidateText}</b>
             <em>${escapeHtml(formatOddsSnapshot(item.odds))}</em>
           </div>
         `;
