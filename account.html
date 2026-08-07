@@ -69,6 +69,7 @@
     .empty b{display:block;color:#aab9c6;font-size:14px;font-weight:600}
     .empty small{display:block;margin-top:6px;font-size:12px}
     .notice{min-height:19px;color:var(--amber);font-size:12px}
+    .notice-toggle{display:flex;align-items:center;gap:9px;margin:10px 0;color:var(--text);font-size:13px}.notice-toggle input{accent-color:var(--cyan);width:17px;height:17px}
     @media(max-width:700px){.shell{padding:12px}.topbar,.profile{align-items:stretch;flex-direction:column}.actions .btn{flex:1}.stats{grid-template-columns:repeat(2,1fr)}.record{grid-template-columns:1fr}.result{text-align:left}}
   </style>
 </head>
@@ -93,6 +94,12 @@
         <div class="stat"><span>待结算</span><b id="pending">--</b></div>
         <div class="stat"><span>胜 / 负</span><b id="winLoss">--</b></div>
         <div class="stat"><span>累计盈亏</span><b id="profit">--</b></div>
+      </section>
+      <section class="card" id="notificationCard">
+        <div class="card-head"><div><h2>邮件通知</h2><p class="hint" id="notificationHint">每轮赛事数据更新后，按类别汇总发送到当前账号邮箱。</p></div></div>
+        <label class="notice-toggle"><input type="checkbox" id="newMatchesEnabled"><span>有新比赛时发送邮件</span></label>
+        <label class="notice-toggle"><input type="checkbox" id="resultsEnabled"><span>有新赛果时发送邮件</span></label>
+        <p class="renew-notice" id="notificationNotice"></p>
       </section>
       <section class="card">
         <div class="card-head"><div><h2>我的下注记录</h2><p class="hint">在竞彩计算器选择比赛后可新增下注记录，赛果同步后会自动结算。</p></div><button class="btn" id="refreshBtn" type="button">刷新记录</button></div>
@@ -147,7 +154,9 @@
         $('adminBtn').classList.toggle('hidden',!user.is_admin);
         $('content').style.display='';
         if(!user.is_active){$('count').textContent=$('pending').textContent=$('winLoss').textContent=$('profit').textContent='--';renderRecords([]);return}
-        const [summary,records]=await Promise.all([api('/bets/summary'),api('/bets')]);
+        const [summary,records,prefs]=await Promise.all([api('/bets/summary'),api('/bets'),api('/notifications/preferences')]);
+        $('newMatchesEnabled').checked=!!prefs.new_matches_enabled;$('resultsEnabled').checked=!!prefs.results_enabled;
+        $('notificationHint').textContent=prefs.smtp_configured?'每轮赛事数据更新后，按类别汇总发送到当前账号邮箱。':'邮件服务尚未配置，请联系管理员配置 SMTP。';
         $('count').textContent=summary.count;$('pending').textContent=summary.pending;
         $('winLoss').textContent=`${summary.won} / ${summary.lost}`;
         $('profit').textContent=Number(summary.profit).toFixed(2);
@@ -159,6 +168,8 @@
     $('calculatorBtn').onclick=()=>location.href='/calculator.html';
     $('adminBtn').onclick=()=>location.href='/admin.html';
     $('refreshBtn').onclick=load;
+    async function saveNotificationPreferences(){try{const p=await api('/notifications/preferences',{method:'PATCH',body:JSON.stringify({new_matches_enabled:$('newMatchesEnabled').checked,results_enabled:$('resultsEnabled').checked})});$('notificationNotice').textContent=p.smtp_configured?'通知设置已保存':'设置已保存，但服务器尚未配置 SMTP';}catch(e){$('notificationNotice').textContent=e.message}}
+    $('newMatchesEnabled').onchange=saveNotificationPreferences;$('resultsEnabled').onchange=saveNotificationPreferences;
     $('logoutBtn').onclick=async()=>{try{await api('/auth/logout',{method:'POST',body:'{}'})}catch(e){}localStorage.removeItem('football_ai_session');localStorage.removeItem('football_ai_admin_session');location.href='/login.html'};
     $('renewForm').onsubmit=async e=>{e.preventDefault();try{const p=await api('/auth/activate',{method:'POST',body:JSON.stringify({activation_code:$('renewCode').value})});$('renewNotice').textContent=p.message;await load()}catch(err){$('renewNotice').textContent=err.message}};
     $('passwordForm').onsubmit=async e=>{e.preventDefault();const np=$('newPassword').value,cp=$('confirmPassword').value;if(np!==cp){$('passwordNotice').textContent='两次输入的新密码不一致';return}if(np.length<8){$('passwordNotice').textContent='新密码至少 8 位';return}try{const p=await api('/auth/password',{method:'POST',body:JSON.stringify({current_password:$('currentPassword').value,new_password:np})});state.token=p.token;localStorage.setItem('football_ai_session',p.token);$('passwordNotice').textContent=p.message;$('passwordForm').reset()}catch(err){$('passwordNotice').textContent=err.message}};

@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, create_engine, func, inspect, select, text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, create_engine, func, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
 from backend.archive_identity import archive_covers_previous
@@ -32,6 +32,7 @@ from backend.data_update_schedule import (
     next_update_at,
     parse_update_times,
 )
+from backend.email_notifications import format_match_lines, send_email, smtp_configured
 
 ROOT = Path(__file__).resolve().parents[1]
 try:
@@ -65,6 +66,26 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     bets: Mapped[list["Bet"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class NotificationPreference(Base):
+    __tablename__ = "notification_preferences"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    new_matches_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    results_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class NotificationDelivery(Base):
+    __tablename__ = "notification_deliveries"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    notification_type: Mapped[str] = mapped_column(String(24), index=True)
+    event_fingerprint: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16), default="sent")
+    error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    __table_args__ = (UniqueConstraint("user_id", "notification_type", "event_fingerprint", name="uq_notification_delivery_event"),)
 
 
 class ActivationToken(Base):
@@ -167,6 +188,8 @@ def initialize_database() -> None:
             connection.execute(text("ALTER TABLE activation_codes ADD COLUMN grant_days INTEGER NULL"))
         if "code_plain" not in activation_code_columns:
             connection.execute(text("ALTER TABLE activation_codes ADD COLUMN code_plain VARCHAR(64) NULL"))
+        # Notification tables are created by metadata above; ensure old databases
+        # receive a default preference row lazily when the account is opened.
 
 
 initialize_database()
@@ -347,6 +370,11 @@ class ActivateRequest(BaseModel):
 
 class UserStatusRequest(BaseModel):
     is_active: bool
+
+
+class NotificationPreferenceRequest(BaseModel):
+    new_matches_enabled: bool | None = None
+    results_enabled: bool | None = None
 
 
 def now() -> datetime:
@@ -748,6 +776,7 @@ def register(payload: RegisterRequest, db: Session = Depends(db_session)) -> dic
     )
     db.add(user)
     db.flush()
+    db.add(NotificationPreference(user_id=user.id))
     if activation_record:
         activation_record.used_at = now()
         activation_record.used_by = user.id
@@ -798,6 +827,39 @@ def me(response: Response, user: User = Depends(current_user_lenient)) -> dict:
     response.set_cookie(AUTH_COOKIE, remember_token(user, expires_at), httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     response.set_cookie(REMEMBER_COOKIE, remember_token(user, expires_at), httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     return user_payload(user)
+
+
+@app.get("/api/notifications/preferences")
+def notification_preferences(user: User = Depends(current_user_lenient), db: Session = Depends(db_session)) -> dict:
+    preference = db.get(NotificationPreference, user.id)
+    if preference is None:
+        preference = NotificationPreference(user_id=user.id)
+        db.add(preference)
+        db.commit()
+        db.refresh(preference)
+    return {
+        "new_matches_enabled": preference.new_matches_enabled,
+        "results_enabled": preference.results_enabled,
+        "smtp_configured": smtp_configured(),
+    }
+
+
+@app.patch("/api/notifications/preferences", dependencies=[Depends(csrf_protect)])
+def update_notification_preferences(payload: NotificationPreferenceRequest, user: User = Depends(current_user_lenient), db: Session = Depends(db_session)) -> dict:
+    preference = db.get(NotificationPreference, user.id)
+    if preference is None:
+        preference = NotificationPreference(user_id=user.id)
+        db.add(preference)
+    if payload.new_matches_enabled is not None:
+        preference.new_matches_enabled = payload.new_matches_enabled
+    if payload.results_enabled is not None:
+        preference.results_enabled = payload.results_enabled
+    db.commit()
+    return {
+        "new_matches_enabled": preference.new_matches_enabled,
+        "results_enabled": preference.results_enabled,
+        "smtp_configured": smtp_configured(),
+    }
 
 
 @app.post("/api/auth/password", dependencies=[Depends(csrf_protect)])
@@ -906,12 +968,102 @@ def stop_data_update_scheduler() -> None:
     DATA_UPDATE_SCHEDULER_STARTED = False
 
 
+def match_identity(match: dict) -> str:
+    fixture_id = str(match.get("fixtureId") or match.get("fixture_id") or "").strip()
+    if fixture_id:
+        return f"fixture:{fixture_id}"
+    item_id = str(match.get("id") or "").strip()
+    if item_id:
+        return f"id:{item_id}"
+    return "match:" + json.dumps({key: match.get(key) for key in ("date", "home", "away")}, ensure_ascii=False, sort_keys=True)
+
+
+def match_result_signature(match: dict) -> str | None:
+    result = match_result(match)
+    score = match_score(match)
+    if result is None and score is None:
+        return None
+    return json.dumps({"result": result, "score": score}, ensure_ascii=False, sort_keys=True)
+
+
+def notification_changes(previous: list[dict], current: list[dict]) -> tuple[list[dict], list[dict]]:
+    old_by_id = {match_identity(item): item for item in previous if isinstance(item, dict)}
+    new_matches: list[dict] = []
+    results: list[dict] = []
+    for item in current:
+        if not isinstance(item, dict):
+            continue
+        identity = match_identity(item)
+        old = old_by_id.get(identity)
+        if old is None:
+            new_matches.append(item)
+        old_result = match_result_signature(old) if old else None
+        current_result = match_result_signature(item)
+        if current_result and current_result != old_result:
+            results.append(item)
+    return new_matches, results
+
+
+def event_fingerprint(notification_type: str, matches: list[dict]) -> str:
+    payload = [{"id": match_identity(item), "result": match_result_signature(item)} for item in matches]
+    return digest(notification_type + ":" + json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+
+def send_update_notifications(previous: list[dict], current: list[dict]) -> None:
+    new_matches, results = notification_changes(previous, current)
+    if not smtp_configured() or (not new_matches and not results):
+        return
+    db = SessionLocal()
+    try:
+        users = db.scalars(select(User).where(User.is_active.is_(True))).all()
+        for user in users:
+            if not user_has_access(user):
+                continue
+            preference = db.get(NotificationPreference, user.id)
+            if preference is None:
+                preference = NotificationPreference(user_id=user.id)
+                db.add(preference)
+                db.commit()
+            for notification_type, enabled, changed, subject, heading in (
+                ("new_matches", preference.new_matches_enabled, new_matches, "新赛事提醒", "本轮新增赛事"),
+                ("results", preference.results_enabled, results, "赛果更新提醒", "本轮更新赛果"),
+            ):
+                if not enabled or not changed:
+                    continue
+                fingerprint = event_fingerprint(notification_type, changed)
+                exists = db.scalar(select(NotificationDelivery).where(
+                    NotificationDelivery.user_id == user.id,
+                    NotificationDelivery.notification_type == notification_type,
+                    NotificationDelivery.event_fingerprint == fingerprint,
+                ))
+                if exists and exists.status == "sent":
+                    continue
+                delivery = exists or NotificationDelivery(user_id=user.id, notification_type=notification_type, event_fingerprint=fingerprint)
+                try:
+                    body = f"您好，\n\n{heading}：\n{format_match_lines(changed, include_result=notification_type == 'results')}\n\n此邮件由 AI 足球赛事研判系统自动发送。"
+                    send_email(user.email, subject, body)
+                    delivery.status, delivery.error = "sent", None
+                except Exception as exc:  # noqa: BLE001
+                    delivery.status, delivery.error = "failed", str(exc)[:500]
+                    write_update_log(f"邮件通知发送失败：user={user.id} type={notification_type} error={exc}")
+                if exists is None:
+                    db.add(delivery)
+                db.commit()
+    finally:
+        db.close()
+
+
 def run_data_update() -> None:
     if not DATA_UPDATE_LOCK.acquire(blocking=False):
         with DATA_UPDATE_STATUS_LOCK:
             DATA_UPDATE_STATUS.update(running=False, message="赛事数据更新正在进行中，请稍后查看", output="", finished_at=now().isoformat())
         return
     try:
+        before_db = SessionLocal()
+        try:
+            previous_matches = load_matches(before_db)
+        finally:
+            before_db.close()
         result = subprocess.run(
             [sys.executable, str(ROOT / "tools" / "update_daily_data.py"), "--history-days", "10", "--history-retention", "400"],
             cwd=ROOT,
@@ -940,6 +1092,18 @@ def run_data_update() -> None:
                 duration_seconds=duration,
             )
         write_update_log(DATA_UPDATE_STATUS["message"], output)
+        if result.returncode == 0:
+            after_db = SessionLocal()
+            try:
+                current_matches = load_matches(after_db)
+            finally:
+                after_db.close()
+            threading.Thread(
+                target=send_update_notifications,
+                args=(previous_matches, current_matches),
+                name="match-notification-worker",
+                daemon=True,
+            ).start()
     except subprocess.TimeoutExpired:
         with DATA_UPDATE_STATUS_LOCK:
             DATA_UPDATE_STATUS.update(running=False, message="赛事数据更新超过 30 分钟，任务已终止", output="", finished_at=now().isoformat())
