@@ -48,21 +48,64 @@ def send_email(to: str, subject: str, body: str, html_body: str | None = None) -
 
 def build_password_reset_email(reset_url: str, expires_minutes: int) -> tuple[str, str]:
     safe_url = html.escape(reset_url, quote=True)
+    expires_label = html.escape(str(expires_minutes))
     plain_body = (
         "您好，\n\n"
-        "我们收到了重置 AI 足球赛事预测系统密码的请求。请在有效期内打开以下链接：\n"
+        "我们收到了重置 AI 足球赛事预测系统密码的请求。\n"
+        "请在有效期内打开以下链接设置新密码：\n"
         f"{reset_url}\n\n"
-        f"该链接将在 {expires_minutes} 分钟后失效，且只能使用一次。若不是您本人操作，请忽略此邮件。"
+        f"该链接将在 {expires_minutes} 分钟后失效，且只能使用一次。\n"
+        "若不是您本人操作，请忽略此邮件，您的密码不会被更改。\n\n"
+        "—— AI 足球赛事预测系统"
     )
     html_body = (
-        '<!doctype html><html><body style="margin:0;background:#f4f6f8;padding:24px;font-family:Arial,\'Microsoft YaHei\',sans-serif;color:#17202b">'
-        '<div style="max-width:560px;margin:0 auto;background:#ffffff;padding:24px;border-radius:8px">'
-        '<h2 style="margin:0 0 12px;font-size:22px">重置登录密码</h2>'
-        '<p style="color:#536174;line-height:1.6">我们收到了重置密码的请求。点击下面的按钮设置新密码：</p>'
-        f'<p><a href="{safe_url}" style="display:inline-block;padding:11px 18px;background:#087f8c;color:#ffffff;text-decoration:none;border-radius:5px">设置新密码</a></p>'
-        f'<p style="color:#536174;font-size:13px;line-height:1.6">链接将在 {expires_minutes} 分钟后失效，且只能使用一次。若不是您本人操作，请忽略此邮件。</p>'
-        '<p style="color:#8a95a3;font-size:12px">此邮件由 AI 足球赛事预测系统自动发送。</p>'
-        '</div></body></html>'
+        '<!doctype html><html lang="zh-CN" xmlns="http://www.w3.org/1999/xhtml">'
+        '<body style="margin:0;padding:0;background:#0b1220;font-family:Arial,\'Microsoft YaHei\',\'Segoe UI\',sans-serif;">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0b1220;padding:32px 16px;">'
+        '<tr><td align="center">'
+        '<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.35);">'
+        # 顶部品牌渐变条
+        '<tr><td style="height:6px;background:linear-gradient(90deg,#32d5ff 0%,#33e6a6 100%);font-size:0;line-height:0;">&nbsp;</td></tr>'
+        # 头部
+        '<tr><td style="padding:34px 36px 8px 36px;">'
+        '<div style="display:inline-block;padding:6px 12px;border-radius:999px;background:rgba(50,213,255,.12);color:#1f8fa6;font-size:12px;font-weight:700;letter-spacing:.6px;">AI 足球赛事预测系统</div>'
+        '<h1 style="margin:16px 0 6px 0;font-size:24px;line-height:1.3;color:#0f1b2d;">重置您的登录密码</h1>'
+        '<p style="margin:0;color:#5a6a7e;font-size:15px;line-height:1.7;">您好，我们收到了重置密码的请求。点击下方按钮即可设置新的登录密码。</p>'
+        '</td></tr>'
+        # 主体按钮
+        '<tr><td style="padding:8px 36px 4px 36px;" align="center">'
+        f'<a href="{safe_url}" style="display:inline-block;padding:15px 34px;margin:8px 0 4px 0;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;background:linear-gradient(135deg,#2bc3f0 0%,#28d99b 100%);box-shadow:0 10px 22px rgba(40,210,155,.28);">立即设置新密码</a>'
+        '<p style="margin:14px 0 0 0;font-size:13px;color:#7a8798;">无法点击按钮？复制以下链接到浏览器地址栏：</p>'
+        f'<p style="margin:6px 0 0 0;padding:10px 12px;background:#f3f6fb;border:1px solid #e2e8f2;border-radius:8px;font-size:12px;line-height:1.6;color:#3f5168;word-break:break-all;">{safe_url}</p>'
+        '</td></tr>'
+        # 步骤提示
+        '<tr><td style="padding:18px 36px 4px 36px;">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+        '<tr>'
+        '<td width="48" valign="top" style="padding-bottom:12px;"><div style="width:30px;height:30px;border-radius:50%;background:rgba(51,230,166,.14);color:#1aa179;font-size:14px;font-weight:700;text-align:center;line-height:30px;">1</div></td>'
+        '<td style="padding:4px 0 12px 8px;font-size:14px;line-height:1.6;color:#3f5168;">点击上方按钮进入重置页面</td>'
+        '</tr>'
+        '<tr>'
+        '<td width="48" valign="top" style="padding-bottom:12px;"><div style="width:30px;height:30px;border-radius:50%;background:rgba(50,213,255,.14);color:#1f8fa6;font-size:14px;font-weight:700;text-align:center;line-height:30px;">2</div></td>'
+        '<td style="padding:4px 0 12px 8px;font-size:14px;line-height:1.6;color:#3f5168;">输入并确认新的登录密码</td>'
+        '</tr>'
+        '<tr>'
+        '<td width="48" valign="top"><div style="width:30px;height:30px;border-radius:50%;background:rgba(255,200,87,.18);color:#b37a16;font-size:14px;font-weight:700;text-align:center;line-height:30px;">3</div></td>'
+        '<td style="padding:4px 0 4px 8px;font-size:14px;line-height:1.6;color:#3f5168;">使用新密码重新登录系统</td>'
+        '</tr>'
+        '</table>'
+        '</td></tr>'
+        # 提示卡
+        f'<tr><td style="padding:8px 36px 0 36px;"><div style="margin:8px 0 0 0;padding:14px 16px;border-left:3px solid #ffc857;background:#fff8ec;border-radius:6px;color:#7a5d12;font-size:13px;line-height:1.65;">该链接将在 <strong>{expires_label} 分钟</strong>后失效，且只能使用一次。若不是您本人操作，请忽略此邮件，您的密码不会被更改。</div></td></tr>'
+        # 页脚
+        '<tr><td style="padding:24px 36px 30px 36px;border-top:1px solid #eef1f6;">'
+        '<p style="margin:0;font-size:12px;line-height:1.7;color:#9aa6b6;">此邮件由 AI 足球赛事预测系统自动发送，请勿直接回复。如需帮助，请前往系统内的帮助中心。</p>'
+        '<p style="margin:8px 0 0 0;font-size:11px;line-height:1.7;color:#b7c1cf;">© AI 足球赛事预测系统 · 保留所有权利</p>'
+        '</td></tr>'
+        '</table>'
+        '</td></tr>'
+        '</table>'
+        '</body></html>'
     )
     return plain_body, html_body
 

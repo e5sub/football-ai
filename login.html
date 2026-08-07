@@ -6,38 +6,42 @@
   <meta name="color-scheme" content="dark">
   <title>登录｜AI足球赛事预测系统</title>
   <style>
-    :root{--bg:#070a0f;--panel:rgba(13,20,30,.86);--line:rgba(140,162,190,.2);--text:#eef5ff;--muted:#91a2b7;--cyan:#32d5ff;--green:#33e6a6;--amber:#ffc857;--red:#ff637d;--shadow:0 20px 60px rgba(0,0,0,.38);font-family:Inter,"SF Pro Display","Microsoft YaHei",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}html,body{min-height:100%;margin:0;background:var(--bg);color:var(--text)}button,input,select{font:inherit;color:inherit}button{border:0;cursor:pointer}.hidden{display:none!important}.auth-gate{min-height:100dvh;display:grid;place-items:center;padding:20px;background:linear-gradient(135deg,rgba(50,213,255,.09),transparent 42%),linear-gradient(315deg,rgba(51,230,166,.08),transparent 42%),#070a0f}.auth-gate-box{width:min(460px,100%)}.auth-gate-box h1{margin:0;font-size:28px}.auth-gate-box p{color:var(--muted);line-height:1.6}.panel{border:1px solid var(--line);border-radius:8px;background:var(--panel);box-shadow:var(--shadow);overflow:hidden}.panel-head{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border-bottom:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,rgba(255,255,255,.045),transparent)}.panel-head>*{min-width:0}.panel-title{margin:0;font-size:14px;letter-spacing:0}.panel-sub{min-width:0;color:var(--muted);font-size:12px;overflow-wrap:anywhere}.panel-body{padding:12px}.input{width:100%;height:38px;border-radius:5px;border:1px solid var(--line);background:rgba(5,10,16,.86);outline:none;padding:0 10px;color:var(--text)}.btn{height:38px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:5px;border:1px solid var(--line);background:rgba(255,255,255,.055);color:#e8f2ff;transition:transform .15s,border-color .15s,background .15s;white-space:nowrap}.btn:hover{transform:translateY(-1px);border-color:rgba(50,213,255,.55);background:rgba(50,213,255,.1)}.btn.primary{background:linear-gradient(135deg,rgba(50,213,255,.26),rgba(51,230,166,.16));border-color:rgba(50,213,255,.58)}.message{min-height:22px;color:var(--amber);font-size:13px}.manual-form{display:grid;gap:12px}.manual-form label{display:grid;gap:7px;color:#d9e7f8;font-size:13px}.manual-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    :root{--bg:#070a0f;--panel:rgba(13,20,30,.86);--line:rgba(140,162,190,.2);--text:#eef5ff;--muted:#91a2b7;--cyan:#32d5ff;--green:#33e6a6;--amber:#ffc857;--red:#ff637d;--shadow:0 20px 60px rgba(0,0,0,.38);font-family:Inter,"SF Pro Display","Microsoft YaHei",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}html,body{min-height:100%;margin:0;background:var(--bg);color:var(--text)}button,input,select{font:inherit;color:inherit}button{border:0;cursor:pointer}.hidden{display:none!important}.auth-gate{min-height:100dvh;display:grid;place-items:center;padding:20px;background:linear-gradient(135deg,rgba(50,213,255,.09),transparent 42%),linear-gradient(315deg,rgba(51,230,166,.08),transparent 42%),#070a0f}.auth-gate-box{width:min(460px,100%)}.auth-gate-box h1{margin:0;font-size:26px;line-height:1.25}.auth-gate-box p{color:var(--muted);line-height:1.6}.panel{border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:var(--shadow);overflow:hidden;backdrop-filter:blur(14px)}.panel-head{min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 18px;border-bottom:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,rgba(255,255,255,.045),transparent)}.panel-head>*{min-width:0}.brand-badge{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;background:rgba(50,213,255,.12);color:var(--cyan);font-size:11px;font-weight:700;letter-spacing:.4px;margin-bottom:8px}.brand-badge::before{content:"";width:7px;height:7px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--green));box-shadow:0 0 8px rgba(50,213,255,.7)}.panel-title{margin:0;font-size:14px;letter-spacing:0}.panel-sub{min-width:0;color:var(--muted);font-size:12px;overflow-wrap:anywhere}.panel-body{padding:16px}.input{width:100%;height:42px;border-radius:8px;border:1px solid var(--line);background:rgba(5,10,16,.86);outline:none;padding:0 12px;color:var(--text);transition:border-color .15s,box-shadow .15s}.input:focus{border-color:rgba(50,213,255,.6);box-shadow:0 0 0 3px rgba(50,213,255,.16)}.btn{height:42px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.055);color:#e8f2ff;transition:transform .15s,border-color .15s,background .15s,opacity .15s;white-space:nowrap;font-weight:600}.btn:hover{transform:translateY(-1px);border-color:rgba(50,213,255,.55);background:rgba(50,213,255,.1)}.btn:active{transform:translateY(0)}.btn.primary{background:linear-gradient(135deg,rgba(50,213,255,.28),rgba(51,230,166,.18));border-color:rgba(50,213,255,.6);color:#f4fbff}.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}.btn-link{height:auto;min-height:34px;padding:0;background:transparent;border:0;color:var(--cyan);font-size:13px;font-weight:600;text-decoration:none;justify-self:start}.btn-link:hover{background:transparent;border:0;color:#74e2ff;text-decoration:underline}.message{min-height:20px;font-size:13px;line-height:1.5}.message.info{color:var(--cyan)}.message.success{color:var(--green)}.message.error{color:var(--red)}.manual-form{display:grid;gap:13px}.manual-form label{display:grid;gap:7px;color:#d9e7f8;font-size:13px}.field-hint{color:var(--muted);font-size:11px;line-height:1.5}.pw-meter{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:2px}.pw-meter span{height:4px;border-radius:3px;background:rgba(255,255,255,.08)}.pw-meter.s1 span:nth-child(1){background:var(--red)}.pw-meter.s2 span:nth-child(-n+2){background:var(--amber)}.pw-meter.s3 span:nth-child(-n+3){background:var(--cyan)}.pw-meter.s4 span{background:var(--green)}.manual-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.form-actions{display:grid;gap:10px}.single-row{display:flex;justify-content:flex-start}.forgot-link{display:flex;justify-content:flex-end;margin-top:-2px}.links-row{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:-2px}
   </style>
 </head>
 <body>
   <section class="auth-gate" id="authGate">
     <div class="panel auth-gate-box">
-      <div class="panel-head"><div><h1 id="gateTitle">AI足球赛事预测系统</h1><div class="panel-sub" id="gateSubtitle">登录后查看赛事研判与个人下注记录</div></div></div>
+      <div class="panel-head"><div><span class="brand-badge">AI 足球赛事预测系统</span><h1 id="gateTitle">欢迎回来</h1><div class="panel-sub" id="gateSubtitle">登录后查看赛事研判与个人下注记录</div></div></div>
       <div class="panel-body">
         <form class="manual-form" id="gateLoginForm">
-          <label>邮箱<input class="input" id="gateEmail" type="email" autocomplete="email" required></label>
-          <label>密码<input class="input" id="gatePassword" type="password" autocomplete="current-password" minlength="8" required></label>
+          <label>邮箱<input class="input" id="gateEmail" type="email" autocomplete="email" placeholder="请输入注册邮箱" required></label>
+          <label>密码<input class="input" id="gatePassword" type="password" autocomplete="current-password" minlength="8" placeholder="请输入登录密码" required></label>
           <div class="manual-actions"><button class="btn primary" type="submit">登录</button><button class="btn" id="gateShowRegisterBtn" type="button">注册账号</button></div>
-          <button class="btn" id="gateShowForgotBtn" type="button">忘记密码</button>
+          <div class="forgot-link"><button class="btn-link" id="gateShowForgotBtn" type="button">忘记密码？</button></div>
         </form>
         <form class="manual-form hidden" id="gateForgotForm">
-          <label>注册邮箱<input class="input" id="gateForgotEmail" type="email" autocomplete="email" required></label>
-          <div class="panel-sub">如果邮箱已注册，我们会发送密码重置链接。</div>
+          <label>注册邮箱<input class="input" id="gateForgotEmail" type="email" autocomplete="email" placeholder="请输入注册邮箱" required></label>
+          <div class="field-hint">如果该邮箱已注册，我们会向其发送一封密码重置邮件。为保护账号安全，无论邮箱是否存在，页面都会显示相同的提示。</div>
           <div class="manual-actions"><button class="btn primary" type="submit">发送重置邮件</button><button class="btn" id="gateForgotBackBtn" type="button">返回登录</button></div>
         </form>
         <form class="manual-form hidden" id="gateResetForm">
-          <label>新密码<input class="input" id="gateResetPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label>
-          <label>确认新密码<input class="input" id="gateResetConfirm" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label>
+          <div class="field-hint">请为您的账号设置新的登录密码。设置成功后，您需要在所有设备上使用新密码重新登录。</div>
+          <label>新密码<input class="input" id="gateResetPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="至少 8 位新密码" required></label>
+          <div class="pw-meter" id="gateResetMeter"><span></span><span></span><span></span><span></span></div>
+          <div class="field-hint" id="gateResetStrength">8-128 位，建议字母与数字组合</div>
+          <label>确认新密码<input class="input" id="gateResetConfirm" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="请再次输入新密码" required></label>
+          <div class="field-hint" id="gateResetMatch"></div>
           <div class="manual-actions"><button class="btn primary" type="submit">设置新密码</button><button class="btn" id="gateResetBackBtn" type="button">返回登录</button></div>
         </form>
         <form class="manual-form hidden" id="gateRegisterForm">
-          <label>邮箱<input class="input" id="gateRegisterEmail" type="email" autocomplete="email" required></label>
-          <label>密码<input class="input" id="gateRegisterPassword" type="password" autocomplete="new-password" minlength="8" required></label>
+          <label>邮箱<input class="input" id="gateRegisterEmail" type="email" autocomplete="email" placeholder="请输入注册邮箱" required></label>
+          <label>密码<input class="input" id="gateRegisterPassword" type="password" autocomplete="new-password" minlength="8" placeholder="至少 8 位密码" required></label>
           <label>激活码（可选）<input class="input" id="gateActivationCode" autocomplete="off" placeholder="管理员提供时填写"></label>
-          <div class="panel-sub">注册默认赠送 3 天使用权，也可填写管理员提供的激活码。</div>
+          <div class="field-hint">注册默认赠送 3 天使用权，也可填写管理员提供的激活码。</div>
           <div class="manual-actions"><button class="btn primary" type="submit">注册</button><button class="btn" id="gateShowLoginBtn" type="button">返回登录</button></div>
         </form>
-        <div class="message" id="gateMessage"></div>
+        <div class="message" id="gateMessage" role="status" aria-live="polite"></div>
       </div>
     </div>
   </section>
@@ -45,15 +49,60 @@
     const state = { csrfToken: "", resetToken: "" };
     const $ = (id) => document.getElementById(id);
 
+    function setMessage(text, kind = "") {
+      const el = $("gateMessage");
+      el.textContent = text || "";
+      el.className = `message ${kind}`.trim();
+    }
+
     function showForm(name) {
       ["gateLoginForm", "gateRegisterForm", "gateForgotForm", "gateResetForm"].forEach((id) => $(id).classList.toggle("hidden", id !== name));
-      $("gateMessage").textContent = "";
+      setMessage("");
+    }
+
+    function setLoading(form, button, loading, labelText) {
+      button.dataset.originalText = button.dataset.originalText || button.textContent;
+      button.textContent = loading ? (labelText || "处理中...") : button.dataset.originalText;
+      button.disabled = loading;
+      form.querySelectorAll("input").forEach((input) => { input.disabled = loading; });
+    }
+
+    function passwordScore(value) {
+      if (!value) return 0;
+      let score = 0;
+      if (value.length >= 8) score += 1;
+      if (value.length >= 12) score += 1;
+      if (/[a-z]/.test(value) && /[A-Z]/.test(value)) score += 1;
+      else if (/[a-zA-Z]/.test(value)) score += 0.5;
+      if (/\d/.test(value)) score += 0.5;
+      if (/[^A-Za-z0-9]/.test(value)) score += 0.5;
+      return Math.max(1, Math.min(4, Math.round(score)));
+    }
+
+    function updateResetMeter() {
+      const value = $("gateResetPassword").value;
+      $("gateResetMeter").className = `pw-meter s${passwordScore(value)}`;
+      const labels = ["", "偏弱", "一般", "较强", "很强"];
+      $("gateResetStrength").textContent = value ? `密码强度：${labels[passwordScore(value)]}` : "8-128 位，建议字母与数字组合";
+      updateResetMatch();
+    }
+
+    function updateResetMatch() {
+      const a = $("gateResetPassword").value;
+      const b = $("gateResetConfirm").value;
+      const el = $("gateResetMatch");
+      if (!b) { el.textContent = ""; el.style.color = ""; }
+      else if (a === b) { el.textContent = "两次输入一致"; el.style.color = "var(--green)"; }
+      else { el.textContent = "两次输入不一致"; el.style.color = "var(--red)"; }
     }
 
     function showLoginForm() {
       state.resetToken = "";
-      $("gateTitle").textContent = "AI足球赛事预测系统";
+      $("gateTitle").textContent = "欢迎回来";
       $("gateSubtitle").textContent = "登录后查看赛事研判与个人下注记录";
+      $("gateResetPassword").value = "";
+      $("gateResetConfirm").value = "";
+      updateResetMeter();
       showForm("gateLoginForm");
     }
 
@@ -71,9 +120,17 @@
       $("gateRegisterForm").addEventListener("submit", registerGate);
       $("gateForgotForm").addEventListener("submit", forgotPassword);
       $("gateResetForm").addEventListener("submit", resetPassword);
-      $("gateShowRegisterBtn").addEventListener("click", () => showForm("gateRegisterForm"));
+      $("gateResetPassword").addEventListener("input", updateResetMeter);
+      $("gateResetConfirm").addEventListener("input", updateResetMatch);
+      $("gateShowRegisterBtn").addEventListener("click", () => {
+        $("gateTitle").textContent = "创建账号";
+        $("gateSubtitle").textContent = "注册后即可使用赛事研判与下注记录功能。";
+        showForm("gateRegisterForm");
+      });
       $("gateShowLoginBtn").addEventListener("click", showLoginForm);
       $("gateShowForgotBtn").addEventListener("click", () => {
+        $("gateTitle").textContent = "找回密码";
+        $("gateSubtitle").textContent = "我们将向注册邮箱发送密码重置链接。";
         $("gateForgotEmail").value = $("gateEmail").value;
         showForm("gateForgotForm");
       });
@@ -103,13 +160,15 @@
         state.csrfToken = payload.csrf_token || "";
         if (!state.csrfToken) throw new Error("CSRF token 获取失败");
       } catch (e) {
-        $("gateMessage").textContent = `初始化失败: ${e.message}`;
+        setMessage(`初始化失败: ${e.message}`, "error");
       }
     }
 
     async function loginGate(event) {
       event.preventDefault();
-      $("gateMessage").textContent = "登录中...";
+      const form = $("gateLoginForm");
+      const button = form.querySelector("button[type=submit]");
+      setLoading(form, button, true, "登录中...");
       try {
         const isAdminLogin = new URLSearchParams(location.search).get("role") === "admin";
         const path = isAdminLogin ? "/admin/login" : "/auth/login";
@@ -118,45 +177,51 @@
         localStorage.setItem("football_ai_session", payload.token);
         const nextPath = safeNextPath();
         location.href = nextPath || (isAdminLogin || (payload.user && payload.user.is_active) ? "/" : "/account.html");
-      } catch (error) { $("gateMessage").textContent = error.message; }
+      } catch (error) { setMessage(error.message, "error"); }
+      finally { setLoading(form, button, false); }
     }
 
     async function forgotPassword(event) {
       event.preventDefault();
-      $("gateMessage").textContent = "正在发送重置邮件...";
+      const form = $("gateForgotForm");
+      const button = form.querySelector("button[type=submit]");
+      setLoading(form, button, true, "发送中...");
       try {
         const payload = await apiRequest("/auth/password/forgot", {method: "POST", body: JSON.stringify({email: $("gateForgotEmail").value})});
-        $("gateMessage").textContent = payload.message;
-      } catch (error) { $("gateMessage").textContent = error.message; }
+        setMessage(payload.message, "success");
+      } catch (error) { setMessage(error.message, "error"); }
+      finally { setLoading(form, button, false); }
     }
 
     async function resetPassword(event) {
       event.preventDefault();
       const newPassword = $("gateResetPassword").value;
-      if (newPassword !== $("gateResetConfirm").value) {
-        $("gateMessage").textContent = "两次输入的密码不一致";
-        return;
-      }
-      $("gateMessage").textContent = "正在重置密码...";
+      if (newPassword.length < 8) { setMessage("新密码至少需要 8 位", "error"); return; }
+      if (newPassword !== $("gateResetConfirm").value) { setMessage("两次输入的密码不一致", "error"); return; }
+      const form = $("gateResetForm");
+      const button = form.querySelector("button[type=submit]");
+      setLoading(form, button, true, "重置中...");
       try {
         const payload = await apiRequest("/auth/password/reset", {method: "POST", body: JSON.stringify({token: state.resetToken, new_password: newPassword})});
-        $("gateResetPassword").value = "";
-        $("gateResetConfirm").value = "";
         showLoginForm();
-        $("gateMessage").textContent = payload.message;
-      } catch (error) { $("gateMessage").textContent = error.message; }
+        setMessage(payload.message, "success");
+      } catch (error) { setMessage(error.message, "error"); }
+      finally { setLoading(form, button, false); }
     }
 
     async function registerGate(event) {
       event.preventDefault();
-      $("gateMessage").textContent = "注册中...";
+      const form = $("gateRegisterForm");
+      const button = form.querySelector("button[type=submit]");
+      setLoading(form, button, true, "注册中...");
       try {
         const activationCode = $("gateActivationCode").value.trim();
         const payload = await apiRequest("/auth/register", {method: "POST", body: JSON.stringify({email: $("gateRegisterEmail").value, password: $("gateRegisterPassword").value, activation_code: activationCode || null})});
         showLoginForm();
-        $("gateMessage").textContent = payload.message + " 请登录。";
+        setMessage(payload.message + " 请登录。", "success");
         $("gateEmail").value = $("gateRegisterEmail").value;
-      } catch (error) { $("gateMessage").textContent = error.message; }
+      } catch (error) { setMessage(error.message, "error"); }
+      finally { setLoading(form, button, false); }
     }
 
     async function init() {
@@ -168,6 +233,7 @@
         history.replaceState(null, "", `${location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}${location.hash}`);
       }
       bindEvents();
+      updateResetMeter();
       if (params.get("role") === "admin") {
         $("gateTitle").textContent = "管理员登录";
         $("gateSubtitle").textContent = "使用管理员账号验证后进入后台。";
@@ -175,7 +241,7 @@
         $("gateShowForgotBtn").classList.add("hidden");
       } else if (state.resetToken) {
         $("gateTitle").textContent = "设置新密码";
-        $("gateSubtitle").textContent = "请输入新的登录密码。";
+        $("gateSubtitle").textContent = "请为您的账号设置新的登录密码。";
         showForm("gateResetForm");
       }
       await loadCsrfToken();
