@@ -2,81 +2,110 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
   <title>用户中心｜AI足球赛事预测系统</title>
   <style>
-    :root{--bg:#071019;--panel:#0d1824;--line:#26394b;--text:#eff7ff;--muted:#94a8ba;--cyan:#41d4ff;--green:#37dfaa;--amber:#ffca63;--red:#ff7389;font-family:Inter,"Microsoft YaHei",system-ui,sans-serif}
+    :root{--bg:#071019;--panel:rgba(13,24,36,.86);--line:rgba(140,168,196,.2);--line2:#26394b;--text:#eff7ff;--muted:#94a8ba;--cyan:#41d4ff;--green:#37dfaa;--amber:#ffca63;--red:#ff7389;--shadow:0 20px 60px rgba(0,0,0,.38);font-family:Inter,"SF Pro Display","Microsoft YaHei",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;background:radial-gradient(circle at 0 0,#12324b 0,transparent 30%),var(--bg);color:var(--text)}
+    body{margin:0;min-height:100vh;background:radial-gradient(circle at 0 0,#12324b 0,transparent 32%),linear-gradient(135deg,rgba(50,213,255,.06),transparent 42%),linear-gradient(315deg,rgba(51,230,166,.05),transparent 42%),var(--bg);color:var(--text)}
     button,input{font:inherit;color:inherit}
     button{cursor:pointer;border:0;background:transparent}
     .hidden{display:none!important}
     .shell{width:min(1080px,100%);margin:auto;padding:22px}
-    .topbar,.card,.stat{border:1px solid var(--line);background:rgba(13,24,36,.93);box-shadow:0 12px 40px rgba(0,0,0,.2)}
-    .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border-radius:14px}
-    .brand{display:flex;align-items:center;gap:12px}
-    .mark{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#1a6680,#1d3d57);color:var(--cyan);font-weight:900}
-    .eyebrow{font:700 11px/1.2 ui-monospace,monospace;letter-spacing:.12em;color:var(--cyan);text-transform:uppercase}
+    .topbar,.card,.stat{border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);backdrop-filter:blur(14px)}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 17px;border-radius:16px}
+    .brand{display:flex;align-items:center;gap:13px;min-width:0}
+    .mark{display:grid;place-items:center;width:46px;height:46px;flex:0 0 46px;border-radius:13px;background:linear-gradient(135deg,#1a6680,#1d3d57);color:var(--cyan);font-weight:900;position:relative;box-shadow:0 8px 22px rgba(26,102,128,.4)}
+    .mark::after{content:"";position:absolute;inset:-1px;border-radius:14px;padding:1px;background:linear-gradient(135deg,rgba(65,212,255,.6),rgba(55,223,170,.3));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+    .eyebrow{display:inline-block;font:700 11px/1.2 ui-monospace,monospace;letter-spacing:.14em;color:var(--cyan);text-transform:uppercase;background:rgba(65,212,255,.1);padding:3px 9px;border-radius:999px}
     h1,h2,h3,p{margin:0}
-    h1{font-size:18px;margin-top:3px}
+    h1{font-size:19px;margin-top:5px}
     .sub,.hint{color:var(--muted);font-size:12px;line-height:1.6}
     .actions{display:flex;gap:8px;flex-wrap:wrap}
-    .btn,.field{border:1px solid var(--line);border-radius:8px;background:#0a141f;min-height:38px}
-    .btn{padding:0 13px;color:var(--text);white-space:nowrap}
-    .btn:hover{border-color:var(--cyan);background:#10293a}
-    .btn.primary{border-color:#287a96;background:linear-gradient(135deg,#123f54,#123b38)}
+    .btn,.field{border:1px solid var(--line);border-radius:9px;background:rgba(5,12,20,.7);min-height:40px}
+    .btn{padding:0 15px;color:#e8f2ff;white-space:nowrap;font-weight:600;transition:transform .15s,border-color .15s,background .15s,opacity .15s}
+    .btn:hover{transform:translateY(-1px);border-color:rgba(65,212,255,.55);background:rgba(65,212,255,.1)}
+    .btn:active{transform:translateY(0)}
+    .btn.primary{border-color:rgba(65,212,255,.6);background:linear-gradient(135deg,rgba(65,212,255,.28),rgba(55,223,170,.18));color:#f4fbff}
     .btn.danger{border-color:#844052;color:#ffc0cc}
-    .field{width:100%;padding:0 11px;outline:0}
+    .btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+    .field{width:100%;padding:0 12px;outline:0;transition:border-color .15s,box-shadow .15s}
+    .field:focus{border-color:rgba(65,212,255,.6);box-shadow:0 0 0 3px rgba(65,212,255,.16)}
     .main{display:grid;gap:16px;margin-top:18px}
-    .card{border-radius:14px;padding:17px}
-    .card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}
-    .card h2{font-size:17px}
+    .card{border-radius:16px;padding:18px;position:relative}
+    .card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:15px}
+    .card-title{display:flex;align-items:center;gap:9px}
+    .card-title .ico{width:18px;height:18px;color:var(--cyan);flex:0 0 18px}
+    .card h2{font-size:16px}
     /* profile */
     .profile{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
-    .identity{display:flex;gap:13px;align-items:center;min-width:0}
-    .avatar{width:52px;height:52px;flex:0 0 52px;display:grid;place-items:center;border-radius:50%;border:1px solid #3286a5;background:#123044;color:var(--cyan);font-size:21px;font-weight:900}
+    .identity{display:flex;gap:14px;align-items:center;min-width:0}
+    .avatar{width:54px;height:54px;flex:0 0 54px;display:grid;place-items:center;border-radius:50%;border:1px solid #3286a5;background:linear-gradient(135deg,#123044,#0d1824);color:var(--cyan);font-size:22px;font-weight:900;box-shadow:0 0 0 4px rgba(65,212,255,.06)}
     .email{font-size:18px;font-weight:800;overflow-wrap:anywhere}
     .plan{margin-top:5px;color:var(--muted);font-size:13px}
     .profile-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .tag{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border:1px solid #28745d;border-radius:99px;color:var(--green);font-size:12px;font-weight:600}
+    .tag{display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:0 11px;border:1px solid #28745d;border-radius:99px;color:var(--green);font-size:12px;font-weight:600}
+    .tag::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
     .tag.warn{color:var(--amber);border-color:#84662b}
     .tag.red{color:#ffafba;border-color:#884656}
     /* renew */
     .renew-card{transition:border-color .15s,background .15s}
-    .renew-card.renew-warn{border-color:#84662b;background:linear-gradient(135deg,rgba(255,202,99,.09),rgba(13,24,36,.93))}
-    .renew-card.renew-red{border-color:#884656;background:linear-gradient(135deg,rgba(255,115,137,.09),rgba(13,24,36,.93))}
+    .renew-card.renew-warn{border-color:#84662b;background:linear-gradient(135deg,rgba(255,202,99,.09),var(--panel))}
+    .renew-card.renew-red{border-color:#884656;background:linear-gradient(135deg,rgba(255,115,137,.09),var(--panel))}
     .renew-form{display:flex;gap:8px;flex-wrap:wrap}
     .renew-form .field{flex:1;min-width:180px}
-    .renew-notice{min-height:18px;color:var(--amber);font-size:12px;margin:10px 0 0}
-    .password-form{display:flex;flex-direction:column;gap:9px;max-width:420px}
+    .password-form{display:flex;flex-direction:column;gap:10px;max-width:420px}
+    .field-row{display:grid;gap:5px}
+    .pw-meter{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+    .pw-meter span{height:4px;border-radius:3px;background:rgba(255,255,255,.08)}
+    .pw-meter.s1 span:nth-child(1){background:var(--red)}
+    .pw-meter.s2 span:nth-child(-n+2){background:var(--amber)}
+    .pw-meter.s3 span:nth-child(-n+3){background:var(--cyan)}
+    .pw-meter.s4 span{background:var(--green)}
+    .field-hint{color:var(--muted);font-size:11px;line-height:1.5;min-height:14px}
     /* stats */
     .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-    .stat{border-radius:12px;padding:14px;transition:transform .15s,box-shadow .15s}
-    .stat:hover{transform:translateY(-2px);box-shadow:0 16px 44px rgba(0,0,0,.28)}
+    .stat{border-radius:13px;padding:15px;transition:transform .15s,box-shadow .15s,border-color .15s;overflow:hidden;position:relative}
+    .stat::before{content:"";position:absolute;left:0;top:0;height:3px;width:100%;background:linear-gradient(90deg,var(--cyan),transparent)}
+    .stat:nth-child(2)::before{background:linear-gradient(90deg,var(--amber),transparent)}
+    .stat:nth-child(3)::before{background:linear-gradient(90deg,var(--green),transparent)}
+    .stat:nth-child(4)::before{background:linear-gradient(90deg,#41d4ff,var(--green))}
+    .stat:hover{transform:translateY(-2px);box-shadow:0 16px 44px rgba(0,0,0,.28);border-color:rgba(65,212,255,.3)}
     .stat span{display:block;color:var(--muted);font-size:12px}
-    .stat b{display:block;margin-top:8px;font-size:24px}
+    .stat b{display:block;margin-top:9px;font-size:25px;font-weight:800}
+    .stat b.pos{color:var(--green)}
+    .stat b.neg{color:var(--red)}
     /* records */
-    .records{display:grid;gap:8px;max-height:560px;overflow:auto;padding-right:3px}
-    .record{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;border:1px solid #203445;border-radius:10px;background:linear-gradient(135deg,rgba(255,255,255,.03),rgba(255,255,255,.01))}
+    .records{display:grid;gap:9px;max-height:560px;overflow:auto;padding-right:3px}
+    .records::-webkit-scrollbar{width:6px}.records::-webkit-scrollbar-thumb{background:rgba(140,168,196,.25);border-radius:3px}
+    .record{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px;border:1px solid #203445;border-radius:11px;background:linear-gradient(135deg,rgba(255,255,255,.035),rgba(255,255,255,.01));transition:border-color .15s,transform .15s}
+    .record:hover{border-color:rgba(65,212,255,.3);transform:translateY(-1px)}
     .record b{display:block;font-size:13px;overflow-wrap:anywhere}
     .record small{display:block;margin-top:5px;color:var(--muted);font-size:11px;line-height:1.6}
     .result{text-align:right;font-size:12px;color:var(--muted);min-width:90px}
     .result.ok{color:var(--green)}
     .result.no{color:var(--red)}
-    .result small{display:block;margin-top:3px;font-size:13px;font-weight:700}
-    .empty{padding:48px 16px;text-align:center;color:var(--muted)}
-    .empty-ico{display:block;width:42px;height:42px;margin:0 auto 14px;opacity:.4}
+    .result small{display:block;margin-top:3px;font-size:14px;font-weight:800}
+    .empty{padding:54px 16px;text-align:center;color:var(--muted)}
+    .empty-ico{display:block;width:46px;height:46px;margin:0 auto 14px;opacity:.4}
     .empty b{display:block;color:#aab9c6;font-size:14px;font-weight:600}
     .empty small{display:block;margin-top:6px;font-size:12px}
-    .notice{min-height:19px;color:var(--amber);font-size:12px}
-    .notice-toggle{display:flex;align-items:center;gap:9px;margin:10px 0;color:var(--text);font-size:13px}.notice-toggle input{accent-color:var(--cyan);width:17px;height:17px}
+    /* notices */
+    .notice,.renew-notice{min-height:18px;font-size:12px}
+    .renew-notice{margin:11px 0 0}
+    .notice{min-height:19px}
+    .ok{color:var(--green)}
+    .err{color:var(--red)}
+    .warn{color:var(--amber)}
+    .notice-toggle{display:flex;align-items:center;gap:10px;margin:11px 0;color:var(--text);font-size:13px}.notice-toggle input{accent-color:var(--cyan);width:18px;height:18px}
     @media(max-width:700px){.shell{padding:12px}.topbar,.profile{align-items:stretch;flex-direction:column}.actions .btn{flex:1}.stats{grid-template-columns:repeat(2,1fr)}.record{grid-template-columns:1fr}.result{text-align:left}}
   </style>
 </head>
 <body>
   <main class="shell">
     <header class="topbar">
-      <div class="brand"><div class="mark">AI</div><div><div class="eyebrow">Member center</div><h1>用户中心</h1><p class="sub">账号状态与个人下注记录</p></div></div>
+      <div class="brand"><div class="mark">AI</div><div><span class="eyebrow">Member center</span><h1>用户中心</h1><p class="sub">账号状态与个人下注记录</p></div></div>
       <div class="actions"><button class="btn" id="homeBtn" type="button">赛事首页</button><button class="btn primary" id="calculatorBtn" type="button">竞彩计算器</button><button class="btn hidden" id="adminBtn" type="button">管理后台</button></div>
     </header>
     <section class="main" id="content" style="display:none">
@@ -85,7 +114,7 @@
         <div class="profile-right"><span class="tag" id="accountStatus">账号可用</span><button class="btn danger" id="logoutBtn" type="button">退出登录</button></div>
       </section>
       <section class="card renew-card" id="renewCard">
-        <div class="card-head"><div><h2>激活码续期</h2><p class="hint" id="renewHint">输入管理员提供的激活码即可延长使用权。</p></div></div>
+        <div class="card-head"><div class="card-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg><div><h2>激活码续期</h2><p class="hint" id="renewHint">输入管理员提供的激活码即可延长使用权。</p></div></div></div>
         <form class="renew-form" id="renewForm"><input class="field" id="renewCode" type="text" placeholder="输入激活码" autocomplete="off" required><button class="btn primary" type="submit">激活续期</button></form>
         <p class="renew-notice" id="renewNotice"></p>
       </section>
@@ -96,22 +125,25 @@
         <div class="stat"><span>累计盈亏</span><b id="profit">--</b></div>
       </section>
       <section class="card" id="notificationCard">
-        <div class="card-head"><div><h2>邮件通知</h2><p class="hint" id="notificationHint">每轮赛事数据更新后，按类别汇总发送到当前账号邮箱。</p></div></div>
+        <div class="card-head"><div class="card-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg><div><h2>邮件通知</h2><p class="hint" id="notificationHint">每轮赛事数据更新后，按类别汇总发送到当前账号邮箱。</p></div></div></div>
         <label class="notice-toggle"><input type="checkbox" id="newMatchesEnabled"><span>有新比赛时发送邮件</span></label>
         <label class="notice-toggle"><input type="checkbox" id="resultsEnabled"><span>有新赛果时发送邮件</span></label>
         <p class="renew-notice" id="notificationNotice"></p>
       </section>
       <section class="card">
-        <div class="card-head"><div><h2>我的下注记录</h2><p class="hint">在竞彩计算器选择比赛后可新增下注记录，赛果同步后会自动结算。</p></div><button class="btn" id="refreshBtn" type="button">刷新记录</button></div>
+        <div class="card-head"><div class="card-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1z"/><path d="M16 5H8a3 3 0 0 0-3 3v11a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3z"/><path d="M9 12h6M9 16h4"/></svg><div><h2>我的下注记录</h2><p class="hint">在竞彩计算器选择比赛后可新增下注记录，赛果同步后会自动结算。</p></div></div><button class="btn" id="refreshBtn" type="button">刷新记录</button></div>
         <div class="records" id="records"></div>
         <p class="notice" id="notice"></p>
       </section>
       <section class="card" id="passwordCard">
-        <div class="card-head"><div><h2>修改密码</h2><p class="hint">需先验证当前密码；更新后其他设备需用新密码重新登录，本页保持登录。</p></div></div>
+        <div class="card-head"><div class="card-title"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><div><h2>修改密码</h2><p class="hint">需先验证当前密码；更新后其他设备需用新密码重新登录，本页保持登录。</p></div></div></div>
         <form class="password-form" id="passwordForm">
           <input class="field" id="currentPassword" type="password" autocomplete="current-password" placeholder="当前密码" required>
-          <input class="field" id="newPassword" type="password" minlength="8" autocomplete="new-password" placeholder="新密码（至少 8 位）" required>
-          <input class="field" id="confirmPassword" type="password" minlength="8" autocomplete="new-password" placeholder="再次输入新密码" required>
+          <div class="field-row"><input class="field" id="newPassword" type="password" minlength="8" autocomplete="new-password" placeholder="新密码（至少 8 位）" required>
+          <div class="pw-meter" id="pwMeter"><span></span><span></span><span></span><span></span></div>
+          <div class="field-hint" id="pwStrength">8-128 位，建议字母与数字组合</div></div>
+          <div class="field-row"><input class="field" id="confirmPassword" type="password" minlength="8" autocomplete="new-password" placeholder="再次输入新密码" required>
+          <div class="field-hint" id="pwMatch"></div></div>
           <button class="btn primary" type="submit">保存新密码</button>
         </form>
         <p class="renew-notice" id="passwordNotice"></p>
@@ -121,6 +153,11 @@
   <script>
     const state={token:localStorage.getItem('football_ai_session')||'',adminToken:localStorage.getItem('football_ai_admin_session')||'',csrf:''};
     const $=id=>document.getElementById(id),escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),formatDate=v=>v?new Date(v).toLocaleString('zh-CN',{hour12:false}):'--';
+    function setNotice(el,text,kind=''){el.textContent=text||'';el.className=(el.className.split(' ').filter(c=>!['ok','err','warn'].includes(c)).join(' ')+(kind?' '+kind:'')).trim()}
+    function setLoading(button,loading,label){button.dataset.orig=button.dataset.orig||button.textContent;button.textContent=loading?(label||'处理中...'):button.dataset.orig;button.disabled=loading}
+    function passwordScore(v){if(!v)return 0;let s=0;if(v.length>=8)s+=1;if(v.length>=12)s+=1;if(/[a-z]/.test(v)&&/[A-Z]/.test(v))s+=1;else if(/[a-zA-Z]/.test(v))s+=.5;if(/\d/.test(v))s+=.5;if(/[^A-Za-z0-9]/.test(v))s+=.5;return Math.max(1,Math.min(4,Math.round(s)))}
+    function updatePwMeter(){const v=$('newPassword').value;$('pwMeter').className='pw-meter s'+passwordScore(v);const labels=['','偏弱','一般','较强','很强'];$('pwStrength').textContent=v?('密码强度：'+labels[passwordScore(v)]):'8-128 位，建议字母与数字组合';updatePwMatch()}
+    function updatePwMatch(){const a=$('newPassword').value,b=$('confirmPassword').value,el=$('pwMatch');if(!b){el.textContent=''}else if(a===b){el.textContent='两次输入一致';el.className='field-hint ok'}else{el.textContent='两次输入不一致';el.className='field-hint err'}}
     async function csrf(){const r=await fetch('/api/auth/csrf',{credentials:'same-origin',cache:'no-store'});state.csrf=(await r.json()).csrf_token||''}
     async function api(path,options={}){const headers={'Content-Type':'application/json'};if(['POST','PATCH','DELETE'].includes(options.method))headers['X-CSRF-Token']=state.csrf;const token=state.token||state.adminToken;if(token)headers.Authorization='Bearer '+token;const r=await fetch('/api'+path,{...options,headers,credentials:'same-origin',cache:'no-store'}),p=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(p.detail||`请求失败（HTTP ${r.status}）`);e.status=r.status;throw e}return p}
 
@@ -153,26 +190,27 @@
         $('renewHint').textContent=info.hint;
         $('adminBtn').classList.toggle('hidden',!user.is_admin);
         $('content').style.display='';
-        if(!user.is_active){$('count').textContent=$('pending').textContent=$('winLoss').textContent=$('profit').textContent='--';renderRecords([]);return}
+        if(!user.is_active){['count','pending','winLoss'].forEach(id=>$(id).textContent='--');const pe=$('profit');pe.textContent='--';pe.className='';renderRecords([]);return}
         const [summary,records,prefs]=await Promise.all([api('/bets/summary'),api('/bets'),api('/notifications/preferences')]);
         $('newMatchesEnabled').checked=!!prefs.new_matches_enabled;$('resultsEnabled').checked=!!prefs.results_enabled;
         $('notificationHint').textContent=prefs.smtp_configured?'每轮赛事数据更新后，按类别汇总发送到当前账号邮箱。':'邮件服务尚未配置，请联系管理员配置 SMTP。';
         $('count').textContent=summary.count;$('pending').textContent=summary.pending;
         $('winLoss').textContent=`${summary.won} / ${summary.lost}`;
-        $('profit').textContent=Number(summary.profit).toFixed(2);
+        const pe=$('profit'),pv=Number(summary.profit);pe.textContent=pv.toFixed(2);pe.className=pv>0?'pos':pv<0?'neg':'';
         renderRecords(records.items);
-      }catch(e){if([401,403].includes(e.status)){localStorage.removeItem('football_ai_session');location.href='/login.html'}else $('notice').textContent=e.message}
+      }catch(e){if([401,403].includes(e.status)){localStorage.removeItem('football_ai_session');location.href='/login.html'}else setNotice($('notice'),e.message,'err')}
     }
 
     $('homeBtn').onclick=()=>location.href='/';
     $('calculatorBtn').onclick=()=>location.href='/calculator.html';
     $('adminBtn').onclick=()=>location.href='/admin.html';
     $('refreshBtn').onclick=load;
-    async function saveNotificationPreferences(){try{const p=await api('/notifications/preferences',{method:'PATCH',body:JSON.stringify({new_matches_enabled:$('newMatchesEnabled').checked,results_enabled:$('resultsEnabled').checked})});$('notificationNotice').textContent=p.smtp_configured?'通知设置已保存':'设置已保存，但服务器尚未配置 SMTP';}catch(e){$('notificationNotice').textContent=e.message}}
+    async function saveNotificationPreferences(){try{const p=await api('/notifications/preferences',{method:'PATCH',body:JSON.stringify({new_matches_enabled:$('newMatchesEnabled').checked,results_enabled:$('resultsEnabled').checked})});setNotice($('notificationNotice'),p.smtp_configured?'通知设置已保存':'设置已保存，但服务器尚未配置 SMTP','ok')}catch(e){setNotice($('notificationNotice'),e.message,'err')}}
     $('newMatchesEnabled').onchange=saveNotificationPreferences;$('resultsEnabled').onchange=saveNotificationPreferences;
     $('logoutBtn').onclick=async()=>{try{await api('/auth/logout',{method:'POST',body:'{}'})}catch(e){}localStorage.removeItem('football_ai_session');localStorage.removeItem('football_ai_admin_session');location.href='/login.html'};
-    $('renewForm').onsubmit=async e=>{e.preventDefault();try{const p=await api('/auth/activate',{method:'POST',body:JSON.stringify({activation_code:$('renewCode').value})});$('renewNotice').textContent=p.message;await load()}catch(err){$('renewNotice').textContent=err.message}};
-    $('passwordForm').onsubmit=async e=>{e.preventDefault();const np=$('newPassword').value,cp=$('confirmPassword').value;if(np!==cp){$('passwordNotice').textContent='两次输入的新密码不一致';return}if(np.length<8){$('passwordNotice').textContent='新密码至少 8 位';return}try{const p=await api('/auth/password',{method:'POST',body:JSON.stringify({current_password:$('currentPassword').value,new_password:np})});state.token=p.token;localStorage.setItem('football_ai_session',p.token);$('passwordNotice').textContent=p.message;$('passwordForm').reset()}catch(err){$('passwordNotice').textContent=err.message}};
+    $('renewForm').onsubmit=async e=>{e.preventDefault();const btn=e.submitter||e.target.querySelector('button[type=submit]');setLoading(btn,true,'激活中...');try{const p=await api('/auth/activate',{method:'POST',body:JSON.stringify({activation_code:$('renewCode').value})});setNotice($('renewNotice'),p.message,'ok');await load()}catch(err){setNotice($('renewNotice'),err.message,'err')}finally{setLoading(btn,false)}};
+    $('newPassword').addEventListener('input',updatePwMeter);$('confirmPassword').addEventListener('input',updatePwMatch);
+    $('passwordForm').onsubmit=async e=>{e.preventDefault();const np=$('newPassword').value,cp=$('confirmPassword').value;if(np.length<8){setNotice($('passwordNotice'),'新密码至少 8 位','err');return}if(np!==cp){setNotice($('passwordNotice'),'两次输入的新密码不一致','err');return}const btn=e.submitter||e.target.querySelector('button[type=submit]');setLoading(btn,true,'保存中...');try{const p=await api('/auth/password',{method:'POST',body:JSON.stringify({current_password:$('currentPassword').value,new_password:np})});state.token=p.token;localStorage.setItem('football_ai_session',p.token);setNotice($('passwordNotice'),p.message,'ok');$('passwordForm').reset();updatePwMeter()}catch(err){setNotice($('passwordNotice'),err.message,'err')}finally{setLoading(btn,false)}};
     async function init(){await csrf();await load()}
     init();
   </script>
