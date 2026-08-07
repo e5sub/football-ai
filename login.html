@@ -18,6 +18,17 @@
           <label>邮箱<input class="input" id="gateEmail" type="email" autocomplete="email" required></label>
           <label>密码<input class="input" id="gatePassword" type="password" autocomplete="current-password" minlength="8" required></label>
           <div class="manual-actions"><button class="btn primary" type="submit">登录</button><button class="btn" id="gateShowRegisterBtn" type="button">注册账号</button></div>
+          <button class="btn" id="gateShowForgotBtn" type="button">忘记密码</button>
+        </form>
+        <form class="manual-form hidden" id="gateForgotForm">
+          <label>注册邮箱<input class="input" id="gateForgotEmail" type="email" autocomplete="email" required></label>
+          <div class="panel-sub">如果邮箱已注册，我们会发送密码重置链接。</div>
+          <div class="manual-actions"><button class="btn primary" type="submit">发送重置邮件</button><button class="btn" id="gateForgotBackBtn" type="button">返回登录</button></div>
+        </form>
+        <form class="manual-form hidden" id="gateResetForm">
+          <label>新密码<input class="input" id="gateResetPassword" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label>
+          <label>确认新密码<input class="input" id="gateResetConfirm" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label>
+          <div class="manual-actions"><button class="btn primary" type="submit">设置新密码</button><button class="btn" id="gateResetBackBtn" type="button">返回登录</button></div>
         </form>
         <form class="manual-form hidden" id="gateRegisterForm">
           <label>邮箱<input class="input" id="gateRegisterEmail" type="email" autocomplete="email" required></label>
@@ -31,8 +42,20 @@
     </div>
   </section>
   <script>
-    const state = { csrfToken: "" };
+    const state = { csrfToken: "", resetToken: "" };
     const $ = (id) => document.getElementById(id);
+
+    function showForm(name) {
+      ["gateLoginForm", "gateRegisterForm", "gateForgotForm", "gateResetForm"].forEach((id) => $(id).classList.toggle("hidden", id !== name));
+      $("gateMessage").textContent = "";
+    }
+
+    function showLoginForm() {
+      state.resetToken = "";
+      $("gateTitle").textContent = "AI足球赛事预测系统";
+      $("gateSubtitle").textContent = "登录后查看赛事研判与个人下注记录";
+      showForm("gateLoginForm");
+    }
 
     function safeNextPath() {
       const raw = new URLSearchParams(location.search).get("next") || "";
@@ -46,8 +69,16 @@
     function bindEvents() {
       $("gateLoginForm").addEventListener("submit", loginGate);
       $("gateRegisterForm").addEventListener("submit", registerGate);
-      $("gateShowRegisterBtn").addEventListener("click", () => { $("gateLoginForm").classList.add("hidden"); $("gateRegisterForm").classList.remove("hidden"); });
-      $("gateShowLoginBtn").addEventListener("click", () => { $("gateRegisterForm").classList.add("hidden"); $("gateLoginForm").classList.remove("hidden"); });
+      $("gateForgotForm").addEventListener("submit", forgotPassword);
+      $("gateResetForm").addEventListener("submit", resetPassword);
+      $("gateShowRegisterBtn").addEventListener("click", () => showForm("gateRegisterForm"));
+      $("gateShowLoginBtn").addEventListener("click", showLoginForm);
+      $("gateShowForgotBtn").addEventListener("click", () => {
+        $("gateForgotEmail").value = $("gateEmail").value;
+        showForm("gateForgotForm");
+      });
+      $("gateForgotBackBtn").addEventListener("click", showLoginForm);
+      $("gateResetBackBtn").addEventListener("click", showLoginForm);
     }
 
     async function apiRequest(path, options = {}) {
@@ -90,27 +121,64 @@
       } catch (error) { $("gateMessage").textContent = error.message; }
     }
 
+    async function forgotPassword(event) {
+      event.preventDefault();
+      $("gateMessage").textContent = "正在发送重置邮件...";
+      try {
+        const payload = await apiRequest("/auth/password/forgot", {method: "POST", body: JSON.stringify({email: $("gateForgotEmail").value})});
+        $("gateMessage").textContent = payload.message;
+      } catch (error) { $("gateMessage").textContent = error.message; }
+    }
+
+    async function resetPassword(event) {
+      event.preventDefault();
+      const newPassword = $("gateResetPassword").value;
+      if (newPassword !== $("gateResetConfirm").value) {
+        $("gateMessage").textContent = "两次输入的密码不一致";
+        return;
+      }
+      $("gateMessage").textContent = "正在重置密码...";
+      try {
+        const payload = await apiRequest("/auth/password/reset", {method: "POST", body: JSON.stringify({token: state.resetToken, new_password: newPassword})});
+        $("gateResetPassword").value = "";
+        $("gateResetConfirm").value = "";
+        showLoginForm();
+        $("gateMessage").textContent = payload.message;
+      } catch (error) { $("gateMessage").textContent = error.message; }
+    }
+
     async function registerGate(event) {
       event.preventDefault();
       $("gateMessage").textContent = "注册中...";
       try {
         const activationCode = $("gateActivationCode").value.trim();
         const payload = await apiRequest("/auth/register", {method: "POST", body: JSON.stringify({email: $("gateRegisterEmail").value, password: $("gateRegisterPassword").value, activation_code: activationCode || null})});
+        showLoginForm();
         $("gateMessage").textContent = payload.message + " 请登录。";
-        $("gateRegisterForm").classList.add("hidden");
-        $("gateLoginForm").classList.remove("hidden");
         $("gateEmail").value = $("gateRegisterEmail").value;
       } catch (error) { $("gateMessage").textContent = error.message; }
     }
 
     async function init() {
-      await loadCsrfToken();
+      const params = new URLSearchParams(location.search);
+      state.resetToken = params.get("reset_token") || "";
+      if (state.resetToken) {
+        params.delete("reset_token");
+        const cleanQuery = params.toString();
+        history.replaceState(null, "", `${location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}${location.hash}`);
+      }
       bindEvents();
-      if (new URLSearchParams(location.search).get("role") === "admin") {
+      if (params.get("role") === "admin") {
         $("gateTitle").textContent = "管理员登录";
         $("gateSubtitle").textContent = "使用管理员账号验证后进入后台。";
         $("gateShowRegisterBtn").classList.add("hidden");
+        $("gateShowForgotBtn").classList.add("hidden");
+      } else if (state.resetToken) {
+        $("gateTitle").textContent = "设置新密码";
+        $("gateSubtitle").textContent = "请输入新的登录密码。";
+        showForm("gateResetForm");
       }
+      await loadCsrfToken();
     }
 
     init();

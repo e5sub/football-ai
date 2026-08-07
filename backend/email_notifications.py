@@ -46,6 +46,27 @@ def send_email(to: str, subject: str, body: str, html_body: str | None = None) -
         server.send_message(message)
 
 
+def build_password_reset_email(reset_url: str, expires_minutes: int) -> tuple[str, str]:
+    safe_url = html.escape(reset_url, quote=True)
+    plain_body = (
+        "您好，\n\n"
+        "我们收到了重置 AI 足球赛事预测系统密码的请求。请在有效期内打开以下链接：\n"
+        f"{reset_url}\n\n"
+        f"该链接将在 {expires_minutes} 分钟后失效，且只能使用一次。若不是您本人操作，请忽略此邮件。"
+    )
+    html_body = (
+        '<!doctype html><html><body style="margin:0;background:#f4f6f8;padding:24px;font-family:Arial,\'Microsoft YaHei\',sans-serif;color:#17202b">'
+        '<div style="max-width:560px;margin:0 auto;background:#ffffff;padding:24px;border-radius:8px">'
+        '<h2 style="margin:0 0 12px;font-size:22px">重置登录密码</h2>'
+        '<p style="color:#536174;line-height:1.6">我们收到了重置密码的请求。点击下面的按钮设置新密码：</p>'
+        f'<p><a href="{safe_url}" style="display:inline-block;padding:11px 18px;background:#087f8c;color:#ffffff;text-decoration:none;border-radius:5px">设置新密码</a></p>'
+        f'<p style="color:#536174;font-size:13px;line-height:1.6">链接将在 {expires_minutes} 分钟后失效，且只能使用一次。若不是您本人操作，请忽略此邮件。</p>'
+        '<p style="color:#8a95a3;font-size:12px">此邮件由 AI 足球赛事预测系统自动发送。</p>'
+        '</div></body></html>'
+    )
+    return plain_body, html_body
+
+
 def _percentage(value: object) -> str:
     try:
         return f"{round(float(value) * 1000) / 10:.1f}%"

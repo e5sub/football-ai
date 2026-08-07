@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import re
@@ -14,7 +15,7 @@ from binascii import Error as BinasciiError
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Literal
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,7 +33,7 @@ from backend.data_update_schedule import (
     next_update_at,
     parse_update_times,
 )
-from backend.email_notifications import build_notification_html, format_match_lines, send_email, smtp_configured
+from backend.email_notifications import build_notification_html, build_password_reset_email, format_match_lines, send_email, smtp_configured
 
 ROOT = Path(__file__).resolve().parents[1]
 try:
@@ -44,6 +45,9 @@ except ImportError:
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{ROOT / 'football_ai.db'}")
 SESSION_DAYS = int(os.getenv("SESSION_DAYS", "365"))
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip()
+PASSWORD_RESET_MINUTES = max(5, int(os.getenv("PASSWORD_RESET_MINUTES", "30")))
+PASSWORD_RESET_COOLDOWN_SECONDS = max(30, int(os.getenv("PASSWORD_RESET_COOLDOWN_SECONDS", "60")))
+logger = logging.getLogger(__name__)
 
 engine_options = {"pool_pre_ping": True}
 if DATABASE_URL.startswith("sqlite"):
@@ -94,6 +98,16 @@ class ActivationToken(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class SessionToken(Base):
@@ -340,6 +354,15 @@ class AdminPasswordResetRequest(BaseModel):
 
 class UserPasswordChangeRequest(BaseModel):
     current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=256)
     new_password: str = Field(min_length=8, max_length=128)
 
 
@@ -818,6 +841,75 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(db_se
     response.set_cookie(AUTH_COOKIE, raw_token, httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     response.set_cookie(REMEMBER_COOKIE, remember_token(user, expires_at), httponly=True, secure=os.getenv("COOKIE_SECURE", "0") == "1", samesite="lax", max_age=SESSION_DAYS * 86400, path="/")
     return {"token": raw_token, "user": user_payload(user)}
+
+
+@app.post("/api/auth/password/forgot", dependencies=[Depends(csrf_protect)])
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(db_session)) -> dict:
+    """Start a password reset without revealing whether the email exists."""
+    generic_message = "如果该邮箱已注册，密码重置邮件将发送到您的邮箱。"
+    email = str(payload.email).lower()
+    user = db.scalar(select(User).where(User.email == email))
+    if not user:
+        return {"message": generic_message}
+
+    latest = db.scalar(
+        select(PasswordResetToken)
+        .where(PasswordResetToken.user_id == user.id)
+        .order_by(PasswordResetToken.created_at.desc())
+    )
+    if latest and (now() - as_utc(latest.created_at)).total_seconds() < PASSWORD_RESET_COOLDOWN_SECONDS:
+        return {"message": generic_message}
+
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used_at.is_(None),
+    ).delete(synchronize_session=False)
+    raw_token = secrets.token_urlsafe(32)
+    expires_at = now() + timedelta(minutes=PASSWORD_RESET_MINUTES)
+    db.add(PasswordResetToken(user_id=user.id, token_hash=digest(raw_token), expires_at=expires_at))
+
+    if not PUBLIC_BASE_URL:
+        db.rollback()
+        logger.warning("Password reset email skipped because PUBLIC_BASE_URL is not configured")
+        return {"message": generic_message}
+    reset_url = f"{PUBLIC_BASE_URL.rstrip('/')}/login.html?reset_token={quote(raw_token, safe='')}"
+    plain_body, html_body = build_password_reset_email(reset_url, PASSWORD_RESET_MINUTES)
+    try:
+        send_email(user.email, "重置 AI 足球赛事预测系统密码", plain_body, html_body)
+        db.commit()
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        logger.exception("Failed to send password reset email")
+    return {"message": generic_message}
+
+
+@app.post("/api/auth/password/reset", dependencies=[Depends(csrf_protect)])
+def reset_password(payload: PasswordResetRequest, db: Session = Depends(db_session)) -> dict:
+    record = db.scalar(select(PasswordResetToken).where(PasswordResetToken.token_hash == digest(payload.token)))
+    if not record or record.used_at or as_utc(record.expires_at) < now():
+        raise HTTPException(status_code=400, detail="重置链接无效或已过期")
+    user = db.get(User, record.user_id)
+    if not user:
+        raise HTTPException(status_code=400, detail="重置链接无效或已过期")
+
+    consumed = db.query(PasswordResetToken).filter(
+        PasswordResetToken.id == record.id,
+        PasswordResetToken.used_at.is_(None),
+        PasswordResetToken.expires_at >= now(),
+    ).update({PasswordResetToken.used_at: now()}, synchronize_session=False)
+    if consumed != 1:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="重置链接无效或已过期")
+    user.password_hash = hash_password(payload.new_password)
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.id != record.id,
+        PasswordResetToken.used_at.is_(None),
+    ).delete(synchronize_session=False)
+    db.query(SessionToken).filter(SessionToken.user_id == user.id).delete(synchronize_session=False)
+    db.query(AdminSession).filter(AdminSession.user_id == user.id).delete(synchronize_session=False)
+    db.commit()
+    return {"message": "密码已重置，请使用新密码登录"}
 
 
 @app.get("/api/auth/me")

@@ -104,7 +104,7 @@ docker compose up -d
 
 ### SMTP 邮件通知配置
 
-在 `.env` 或 Compose 环境变量中配置：`SMTP_HOST`、`SMTP_PORT`（默认 587）、`SMTP_USER`、`SMTP_PASSWORD`、`SMTP_FROM`、`SMTP_USE_TLS=1`、`SMTP_USE_SSL=0`、`SMTP_TIMEOUT=20`。新用户默认开启“新比赛”和“新赛果”两类通知，可在用户中心分别关闭。每轮成功更新最多按类别发送两封汇总邮件；未配置 SMTP 或邮件发送失败不会阻断赛事数据更新。
+在 `.env` 或 Compose 环境变量中配置：`SMTP_HOST`、`SMTP_PORT`（默认 587）、`SMTP_USER`、`SMTP_PASSWORD`、`SMTP_FROM`、`SMTP_USE_TLS=1`、`SMTP_USE_SSL=0`、`SMTP_TIMEOUT=20`。`PUBLIC_BASE_URL` 必须填写用户可访问的 HTTPS 站点地址，邮件找回密码会据此生成链接；`PASSWORD_RESET_MINUTES` 默认 30 分钟，`PASSWORD_RESET_COOLDOWN_SECONDS` 默认 60 秒。重置链接只能使用一次，成功重置会撤销该账号的现有会话。新用户默认开启“新比赛”和“新赛果”两类通知，可在用户中心分别关闭。每轮成功更新最多按类别发送两封汇总邮件；未配置 SMTP 或邮件发送失败不会阻断赛事数据更新或泄露邮箱是否注册。
 
 应用首次启动会自动创建全部数据表，并兼容已有旧版本数据库，补充管理员字段和会话字段。SQLite 使用本地 `football_ai.db` 文件，数据库文件和表都会自动创建；MySQL 需要先创建数据库本身，应用启动时会自动创建表和索引：
 
