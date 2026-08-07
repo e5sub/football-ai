@@ -1,8 +1,10 @@
 import os
 import unittest
+from email import policy
+from email.parser import BytesParser
 from unittest.mock import patch
 
-from backend.email_notifications import format_match_lines, send_email
+from backend.email_notifications import build_notification_html, format_match_lines, send_email
 from backend.main import match_identity, notification_changes
 
 
@@ -33,12 +35,29 @@ class EmailTests(unittest.TestCase):
         "SMTP_USER": "robot@example.com", "SMTP_PASSWORD": "secret", "SMTP_USE_TLS": "0",
     }, clear=False)
     @patch("backend.email_notifications.smtplib.SMTP")
-    def test_smtp_message_contains_match(self, smtp_class):
+    def test_smtp_message_contains_plain_and_html_match(self, smtp_class):
         server = smtp_class.return_value.__enter__.return_value
-        send_email("user@example.com", "新赛事提醒", format_match_lines([{"home": "甲", "away": "乙", "date": "今晚"}]))
+        match = {
+            "home": "甲 & 队",
+            "away": "乙 <队>",
+            "date": "今晚",
+            "conclusion": {"primary": "客胜", "recommendationTier": "重点"},
+            "upset": {"score": 0.541},
+        }
+        plain = format_match_lines([match])
+        send_email("user@example.com", "新赛事提醒", plain, build_notification_html("本轮新增赛事", [match]))
         message = server.send_message.call_args.args[0]
-        self.assertEqual(message["To"], "user@example.com")
-        self.assertIn("甲 vs 乙", message.get_content())
+        parsed = BytesParser(policy=policy.default).parsebytes(message.as_bytes())
+        self.assertEqual(parsed["To"], "user@example.com")
+        self.assertTrue(parsed.is_multipart())
+        self.assertEqual(parsed.get_content_type(), "multipart/alternative")
+        parts = {part.get_content_type(): part.get_content() for part in parsed.iter_parts()}
+        self.assertIn("甲 & 队 vs 乙 <队>", parts["text/plain"])
+        self.assertIn("客胜", parts["text/html"])
+        self.assertIn("重点", parts["text/html"])
+        self.assertIn("冷门 54.1%", parts["text/html"])
+        self.assertIn("甲 &amp; 队", parts["text/html"])
+        self.assertIn("乙 &lt;队&gt;", parts["text/html"])
 
     @patch.dict(os.environ, {}, clear=True)
     def test_missing_smtp_configuration_fails_explicitly(self):

@@ -32,7 +32,7 @@ from backend.data_update_schedule import (
     next_update_at,
     parse_update_times,
 )
-from backend.email_notifications import format_match_lines, send_email, smtp_configured
+from backend.email_notifications import build_notification_html, format_match_lines, send_email, smtp_configured
 
 ROOT = Path(__file__).resolve().parents[1]
 try:
@@ -1040,8 +1040,10 @@ def send_update_notifications(previous: list[dict], current: list[dict]) -> None
                     continue
                 delivery = exists or NotificationDelivery(user_id=user.id, notification_type=notification_type, event_fingerprint=fingerprint)
                 try:
-                    body = f"您好，\n\n{heading}：\n{format_match_lines(changed, include_result=notification_type == 'results')}\n\n此邮件由 AI 足球赛事研判系统自动发送。"
-                    send_email(user.email, subject, body)
+                    include_result = notification_type == "results"
+                    body = f"您好，\n\n{heading}：\n{format_match_lines(changed, include_result=include_result)}\n\n此邮件由 AI 足球赛事研判系统自动发送。"
+                    html_body = build_notification_html(heading, changed, include_result=include_result)
+                    send_email(user.email, subject, body, html_body)
                     delivery.status, delivery.error = "sent", None
                 except Exception as exc:  # noqa: BLE001
                     delivery.status, delivery.error = "failed", str(exc)[:500]
